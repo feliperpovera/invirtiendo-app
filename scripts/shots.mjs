@@ -1,0 +1,15 @@
+import { chromium } from "playwright";
+const base = process.argv[2] ?? "http://localhost:3000";
+const out = process.argv[3] ?? "/tmp";
+const b = await chromium.launch(); const p = await b.newPage({ viewport: { width: 1280, height: 860 } });
+await p.goto(base, { waitUntil: "networkidle" });
+await p.fill("#search-main", "micro"); await p.waitForTimeout(1200);
+await p.screenshot({ path: `${out}/home-search.png` });
+const onTop = await p.evaluate(() => { const li = document.querySelector("#search-results li button"); if (!li) return "no-list"; const r = li.getBoundingClientRect(); const e = document.elementFromPoint(r.left + 30, r.top + 12); return e && e.closest("#search-results") ? "list-on-top" : "covered:" + e?.tagName + "." + (e?.className || "").toString().slice(0, 30); });
+console.log("dropdown:", onTop);
+await p.goto(`${base}/accion/NVDA`, { waitUntil: "domcontentloaded" });
+await p.waitForSelector("text=Agregar a watchlist", { timeout: 90000 });
+await p.screenshot({ path: `${out}/nvda-top.png` });
+await p.evaluate(() => window.scrollTo(0, 900)); await p.waitForTimeout(300);
+await p.screenshot({ path: `${out}/nvda-mid.png` });
+await b.close();

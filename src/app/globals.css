@@ -1,0 +1,248 @@
+@import "tailwindcss";
+
+/* ── Invirtiendo brand tokens ─────────────────────────────────────────
+   Extraídos de los carruseles y el logo (@Invirtiendoo):
+   crema #F5EAD8 · tinta #22211D · terracota #C46D34 · oliva #6B6E55
+   Display: Fraunces (soft, chunky) · Texto: Figtree                */
+:root {
+  --cream: #f5ead8;
+  --cream-2: #ede0c8;
+  --paper: #fbf5ea;
+  --line: #d9cbb3;
+  --line-soft: #e8dcc6;
+
+  --ink: #22211d;
+  --ink-2: #33312b;
+  --ink-soft: #64615a;
+  --muted: #9b9486;
+
+  --terracotta: #c46d34;
+  --terracotta-deep: #a4582a;
+  --terracotta-soft: #ebd0b6;
+  --terracotta-tint: #f3e2d0;
+
+  --olive: #6b6e55;
+  --olive-deep: #565a43;
+  --olive-2: #8b8d6f;
+  --olive-soft: #cfd1bb;
+  --olive-tint: #e3e4d3;
+
+  /* Semáforo de señal (siempre dentro de la familia de marca) */
+  --sig-strong: #566043;   /* oportunidad atractiva  */
+  --sig-good: #7f8a5e;     /* compra gradual         */
+  --sig-watch: #c9a562;    /* observar               */
+  --sig-wait: #c46d34;     /* esperar mejor precio   */
+  --sig-avoid: #8a3a22;    /* evitar / descartar     */
+
+  --radius-lg: 22px;
+  --radius-md: 14px;
+  --radius-sm: 9px;
+  --shadow-card: 0 1px 0 rgba(34, 33, 29, 0.06), 0 10px 30px -18px rgba(34, 33, 29, 0.35);
+}
+
+@theme inline {
+  --color-cream: var(--cream);
+  --color-cream-2: var(--cream-2);
+  --color-paper: var(--paper);
+  --color-line: var(--line);
+  --color-line-soft: var(--line-soft);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-soft: var(--ink-soft);
+  --color-muted: var(--muted);
+  --color-terracotta: var(--terracotta);
+  --color-terracotta-deep: var(--terracotta-deep);
+  --color-terracotta-soft: var(--terracotta-soft);
+  --color-terracotta-tint: var(--terracotta-tint);
+  --color-olive: var(--olive);
+  --color-olive-deep: var(--olive-deep);
+  --color-olive-2: var(--olive-2);
+  --color-olive-soft: var(--olive-soft);
+  --color-olive-tint: var(--olive-tint);
+  --color-sig-strong: var(--sig-strong);
+  --color-sig-good: var(--sig-good);
+  --color-sig-watch: var(--sig-watch);
+  --color-sig-wait: var(--sig-wait);
+  --color-sig-avoid: var(--sig-avoid);
+  --font-display: var(--font-fraunces), "Cooper Black", Georgia, serif;
+  --font-sans: var(--font-figtree), ui-sans-serif, system-ui, sans-serif;
+  --radius-lg: 22px;
+  --radius-md: 14px;
+  --radius-sm: 9px;
+}
+
+html {
+  color-scheme: light;
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--cream);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-feature-settings: "tnum" 1, "ss01" 1;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+.font-display {
+  font-family: var(--font-display);
+  font-variation-settings: "SOFT" 100, "WONK" 1, "opsz" 144;
+  letter-spacing: -0.015em;
+  font-weight: 800;
+}
+
+.eyebrow {
+  font-size: 0.72rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--terracotta);
+}
+
+.card {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+}
+
+.card-ink {
+  background: var(--ink);
+  color: var(--cream);
+  border-radius: var(--radius-lg);
+  border: 1px solid #3a3831;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border-radius: 999px;
+  /* Alto mínimo ~26px (0.44rem*2 + line-height): por debajo de 24px CSS un tap en móvil falla seguido. */
+  padding: 0.44rem 0.75rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+/* Foco visible accesible */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 3px solid var(--terracotta);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* Scrollbars discretos en tablas anchas, con sombra a los bordes que anuncia que hay más
+   contenido al deslizar (sin eso, una tabla ancha cortada en el borde del teléfono se lee
+   como contenido roto, no como "desliza para ver más"). Truco solo-CSS: dos sombras fijas
+   a la ventana (scroll) detrás de dos velos que se mueven con el contenido (local) y lo tapan
+   cuando no hay más para ese lado. */
+.scroll-x {
+  overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+  background-color: var(--paper);
+  background-image:
+    linear-gradient(to right, var(--paper) 50%, transparent),
+    linear-gradient(to left, var(--paper) 50%, transparent),
+    linear-gradient(to right, rgba(34, 33, 29, 0.12), transparent),
+    linear-gradient(to left, rgba(34, 33, 29, 0.12), transparent);
+  background-position:
+    left center,
+    right center,
+    left center,
+    right center;
+  background-repeat: no-repeat;
+  background-size:
+    24px 100%,
+    24px 100%,
+    10px 100%,
+    10px 100%;
+  background-attachment: local, local, scroll, scroll;
+}
+
+/* Animaciones suaves, respetando reduced motion */
+@keyframes rise {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.rise { animation: rise 320ms ease-out; }
+.rise-2 { animation-delay: 60ms; }
+.rise-3 { animation-delay: 120ms; }
+.rise-4 { animation-delay: 180ms; }
+
+@keyframes shimmer {
+  0% { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+.skeleton {
+  background: linear-gradient(90deg, var(--cream-2) 25%, var(--paper) 50%, var(--cream-2) 75%);
+  background-size: 800px 100%;
+  animation: shimmer 1.4s linear infinite;
+  border-radius: var(--radius-sm);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rise, .skeleton { animation: none !important; }
+  html { scroll-behavior: auto; }
+}
+
+/* Texto en tinta sobre fondo tinta */
+.card-ink .eyebrow { color: #e0a074; }
+.card-ink .muted { color: #b9b1a1; }
+.muted { color: var(--ink-soft); }
+
+/* Inputs */
+.input {
+  width: 100%;
+  background: var(--paper);
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: 0.8rem 1rem;
+  font-size: 1rem;
+  color: var(--ink);
+}
+.input::placeholder { color: var(--muted); }
+.input:focus { border-color: var(--terracotta); outline: none; box-shadow: 0 0 0 4px rgba(196, 109, 52, 0.15); }
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 999px;
+  padding: 0.7rem 1.2rem;
+  font-weight: 700;
+  font-size: 0.92rem;
+  transition: transform 120ms ease, background 120ms ease, opacity 120ms ease;
+  cursor: pointer;
+}
+.btn:active { transform: translateY(1px); }
+.btn-primary { background: var(--terracotta); color: var(--cream); }
+.btn-primary:hover { background: var(--terracotta-deep); }
+.btn-ink { background: var(--ink); color: var(--cream); }
+.btn-ink:hover { background: var(--ink-2); }
+.btn-ghost { background: transparent; border: 1.5px solid var(--line); color: var(--ink); }
+.btn-ghost:hover { border-color: var(--ink); }
+.btn[disabled] { opacity: 0.5; cursor: not-allowed; }
+
+/* Tablas de datos */
+.table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 0.9rem; }
+.table th {
+  text-align: left; font-size: 0.7rem; letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--ink-soft); font-weight: 700; padding: 0.6rem 0.75rem; border-bottom: 1px solid var(--line);
+}
+.table td { padding: 0.7rem 0.75rem; border-bottom: 1px solid var(--line-soft); vertical-align: middle; }
+.table tr:last-child td { border-bottom: none; }
+.table td.num, .table th.num { text-align: right; }
