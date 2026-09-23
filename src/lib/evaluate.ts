@@ -247,7 +247,7 @@ export async function evaluate(raw: string): Promise<Evaluation> {
   }
 
   // 2) Todo lo demás en paralelo
-  const [prof, hist, sec, secQ, yf, ysum, fm, fpeers, rec, ins, fnews, earn, cal, pgNews, avNews, mxNews, ynews, spx, tnx, plat, finra, wsb, cop] = await Promise.all([
+  const [prof, hist, sec, secQ, yf, ysum, fm, fpeers, rec, ins, fnews, earn, cal, pgNews, ynews, spx, tnx, plat, finra, wsb, cop] = await Promise.all([
     settle(fh ? finnhubProfile(symbol) : skip<Profile>()),
     settle(yahooHistory(symbol)),
     settle(secAnnualHistory(symbol)),
@@ -262,8 +262,6 @@ export async function evaluate(raw: string): Promise<Evaluation> {
     settle(fh ? finnhubEarnings(symbol) : Promise.resolve([] as EarningsSurprise[])),
     settle(fh ? finnhubEarningsCalendar(symbol) : Promise.resolve<EarningsCalendar | null>(null)),
     settle(polygonEnabled() ? polygonNews(symbol) : skip<NewsItem[]>()),
-    settle(alphaEnabled() ? alphaNewsSentiment(symbol) : skip<NewsItem[]>()),
-    settle(marketauxEnabled() ? marketauxNews(symbol) : skip<NewsItem[]>()),
     settle(yahooNews(symbol)),
     settle(yahooIndex("^GSPC")),
     settle(yahooIndex("^TNX")),
@@ -513,7 +511,15 @@ export async function evaluate(raw: string): Promise<Evaluation> {
   }
   const risk = riskPillar(quote, d, metrics, history, calendar, ind, quality.passCount, val(spx)?.closes1y ?? null);
 
-  // Noticias y sentimiento
+  // Noticias y sentimiento. Alpha Vantage (25/día) y Marketaux (100/día) son solo respaldo:
+  // se consultan uno tras otro únicamente si Polygon no trajo noticias. Antes iban en paralelo en
+  // cada evaluación y el ranking diario (108 acciones) agotaba sus cupos todos los días.
+  const noPedida: Settled<NewsItem[]> = { ok: true, v: [] };
+  let avNews: Settled<NewsItem[]> = noPedida;
+  let mxNews: Settled<NewsItem[]> = noPedida;
+  const hayPolygon = pgNews.ok && pgNews.v.length > 0;
+  if (!hayPolygon && alphaEnabled()) avNews = await settle(alphaNewsSentiment(symbol));
+  if (!hayPolygon && !(avNews.ok && avNews.v.length) && marketauxEnabled()) mxNews = await settle(marketauxNews(symbol));
   let primary: NewsItem[] = [];
   let provider: ProviderName = "lexicon";
   if (pgNews.ok && pgNews.v.length) {
@@ -527,8 +533,8 @@ export async function evaluate(raw: string): Promise<Evaluation> {
     provider = "marketaux";
   }
   if (polygonEnabled()) mark("polygon", pgNews.ok, pgNews.ok ? `${pgNews.v.length} noticias con sentimiento por ticker` : `Polygon: ${err(pgNews)}`);
-  if (alphaEnabled()) mark("alphavantage", avNews.ok, avNews.ok ? `${avNews.v.length} noticias con sentimiento` : `Alpha Vantage: ${err(avNews)}`);
-  if (marketauxEnabled()) mark("marketaux", mxNews.ok, mxNews.ok ? `${mxNews.v.length} noticias` : `Marketaux: ${err(mxNews)}`);
+  if (avNews !== noPedida) mark("alphavantage", avNews.ok, avNews.ok ? `${avNews.v.length} noticias con sentimiento` : `Alpha Vantage: ${err(avNews)}`);
+  if (mxNews !== noPedida) mark("marketaux", mxNews.ok, mxNews.ok ? `${mxNews.v.length} noticias` : `Marketaux: ${err(mxNews)}`);
   const news = mergeNews(primary, val(avNews) ?? [], val(mxNews) ?? [], val(fnews) ?? [], val(ynews) ?? []);
   const sentiment = sentimentPillar(news, analyst, insiders, surprises, provider);
 

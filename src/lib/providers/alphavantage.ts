@@ -3,6 +3,7 @@
  * con score de sentimiento POR TICKER (-1..1) y etiqueta Bullish/Bearish.
  * Se cachea 12 h por símbolo para proteger la cuota diaria.
  */
+import { reservarCupo, CUPO } from "./cupo";
 import { fetchJson, env, ProviderError } from "./http";
 import { cached, TTL } from "./cache";
 import type { NewsItem, SentLabel } from "@/lib/analysis/types";
@@ -66,8 +67,10 @@ export async function alphaNewsSentiment(symbol: string): Promise<NewsItem[]> {
   const key = env.alphavantage();
   if (!key) throw new ProviderError("alphavantage", 401, "sin ALPHAVANTAGE_API_KEY");
   return cached(`av:news:${symbol}`, TTL.sentimentAV, async () => {
+    // 25 al día: solo se llama con cupo propio. Si no hay, falla sin guardar en caché y se reintenta otro día.
+    if (!(await reservarCupo("alphavantage"))) throw new ProviderError("alphavantage", 429, `cupo propio del día agotado (tope ${CUPO.alphavantage})`);
     const url = `https://www.alphavantage.co/query?function=NEWS_SENTIMENT&tickers=${encodeURIComponent(symbol)}&limit=50&sort=LATEST&apikey=${key}`;
-    const d = await fetchJson<AVResp>("alphavantage", url, { timeoutMs: 15000 });
+    const d = await fetchJson<AVResp>("alphavantage", url, { timeoutMs: 8000 });
     if (d.Information || d.Note) throw new ProviderError("alphavantage", 429, d.Information || d.Note || "límite");
     if (d["Error Message"]) throw new ProviderError("alphavantage", 400, d["Error Message"]);
     return (d.feed ?? []).map((f, i) => {
