@@ -39,7 +39,7 @@ function Grafica({ filas, k, titulo, fmt }: { filas: ConsensoFila[]; k: Clave; t
         {pasado.length > 1 && <path d={linea(pasado, (f) => f[k] as number)} fill="none" stroke="var(--olive-deep)" strokeWidth="2.4" />}
         {puente.length > 1 && <path d={linea(puente, (f) => f[k] as number)} fill="none" stroke="var(--terracotta)" strokeWidth="2.2" strokeDasharray="6 4" />}
         {pts.map((f) => (
-          <circle key={f.fy} cx={x(idx(f))} cy={y(f[k] as number)} r="3.4" fill={f.estimado ? "var(--terracotta)" : "var(--olive-deep)"}>
+          <circle key={f.fy} cx={x(idx(f))} cy={y(f[k] as number)} r="3.4" fill={(k === "revenue" ? f.proyRev : f.proyEps) ? "var(--cream, #f5eedc)" : f.estimado ? "var(--terracotta)" : "var(--olive-deep)"} stroke="var(--terracotta)" strokeWidth={(k === "revenue" ? f.proyRev : f.proyEps) ? 1.6 : 0}>
             <title>{`FY ${f.fy}: ${fmt(f[k] as number)}${f.estimado && isNum(f[lo]) && isNum(f[hi]) ? ` (rango ${fmt(f[lo] as number)} – ${fmt(f[hi] as number)})` : ""}`}</title>
           </circle>
         ))}
@@ -56,11 +56,15 @@ function Grafica({ filas, k, titulo, fmt }: { filas: ConsensoFila[]; k: Clave; t
 
 export function Consenso({ filas, moneda = "USD" }: { filas: ConsensoFila[]; moneda?: string }) {
   if (filas.length < 2 || !filas.some((f) => f.estimado)) return null;
-  const fila = (label: string, f: (c: ConsensoFila) => string) => (
+  const proy = (c: ConsensoFila, k?: "rev" | "eps") => (k === "rev" ? c.proyRev : k === "eps" ? c.proyEps : false);
+  const fila = (label: string, f: (c: ConsensoFila) => string, k?: "rev" | "eps") => (
     <tr key={label}>
       <th scope="row" className="text-left font-medium whitespace-nowrap">{label}</th>
       {filas.map((c) => (
-        <td key={c.fy} className="num" style={{ background: c.estimado ? "var(--terracotta-tint)" : "var(--olive-tint)" }}>{f(c)}</td>
+        <td key={c.fy} className={`num ${proy(c, k) ? "italic text-ink-soft" : ""}`} style={{ background: c.estimado ? "var(--terracotta-tint)" : "var(--olive-tint)" }} title={proy(c, k) ? "Proyección Invirtiendo (sin consenso publicado)" : undefined}>
+          {f(c)}
+          {proy(c, k) && f(c) !== "—" && <sup className="ml-0.5 not-italic">p</sup>}
+        </td>
       ))}
     </tr>
   );
@@ -81,14 +85,14 @@ export function Consenso({ filas, moneda = "USD" }: { filas: ConsensoFila[]; mon
             </thead>
             <tbody>
               {fila("Cierre", (c) => c.end ?? "—")}
-              {fila(`Ingresos (${moneda})`, (c) => fmtBig(c.revenue, 2))}
-              {fila("Crec. ingresos", (c) => fmtPct(c.revGrowth, 1))}
-              {fila("EPS", (c) => (isNum(c.eps) ? fmtNum(c.eps, 2) : "—"))}
-              {fila("Crec. EPS", (c) => fmtPct(c.epsGrowth, 1))}
+              {fila(`Ingresos (${moneda})`, (c) => fmtBig(c.revenue, 2), "rev")}
+              {fila("Crec. ingresos", (c) => fmtPct(c.revGrowth, 1), "rev")}
+              {fila("EPS", (c) => (isNum(c.eps) ? fmtNum(c.eps, 2) : "—"), "eps")}
+              {fila("Crec. EPS", (c) => fmtPct(c.epsGrowth, 1), "eps")}
               {fila("Analistas: ingresos", (c) => n(c.revN))}
               {fila("Analistas: EPS", (c) => n(c.epsN))}
-              {fila("P/S", (c) => fmtX(c.ps, 2))}
-              {fila("P/E", (c) => fmtX(c.pe, 2))}
+              {fila("P/S", (c) => fmtX(c.ps, 2), "rev")}
+              {fila("P/E", (c) => fmtX(c.pe, 2), "eps")}
             </tbody>
           </table>
         </div>
@@ -99,7 +103,7 @@ export function Consenso({ filas, moneda = "USD" }: { filas: ConsensoFila[]; mon
           <Grafica filas={filas} k="eps" titulo="EPS" fmt={(v) => fmtNum(v, 2)} />
         </div>
         <p className="text-xs text-ink-soft mt-3">
-          Verde = reportado (10-K). Naranja = consenso de analistas: ingresos y EPS de este año y el próximo (Yahoo Finance) y EPS hasta 4 años (Nasdaq). Más allá del próximo año no hay consenso público de ingresos. P/S y P/E futuros con el precio de hoy.
+          Verde = reportado (10-K). Naranja = consenso de analistas: ingresos y EPS de este año y el próximo (Yahoo Finance) y EPS hasta 4 años (Nasdaq). Horizonte de 5 años: donde no hay consenso publicado, el valor es una <b>proyección Invirtiendo</b> (cursiva con <sup>p</sup>, punto hueco en la gráfica): el crecimiento del último año con consenso converge al crecimiento a 5 años que estiman los analistas, y el rango se abre ±10% por año. P/S y P/E futuros con el precio de hoy.
         </p>
       </Card>
     </section>

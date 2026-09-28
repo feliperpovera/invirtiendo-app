@@ -606,6 +606,6 @@ export async function evaluate(raw: string): Promise<Evaluation> {
     sources,
     warnings,
     complementos: { shortInterest: val(finra), wsb: val(wsb), usdCop: val(cop) },
-    consenso: buildConsenso({ annual: fundamentals.annual, yahoo: ys?.estimates.rango, nasdaq: val(nq) ?? [], price: quote.price, shares: profile.sharesOutstanding, monthly: history.monthly, usd: !foreignStatements }),
+    consenso: buildConsenso({ annual: fundamentals.annual, yahoo: ys?.estimates.rango, nasdaq: val(nq) ?? [], price: quote.price, shares: profile.sharesOutstanding, monthly: history.monthly, usd: !foreignStatements, g5: ys?.growth.next5y ?? null }),
   };
 }
