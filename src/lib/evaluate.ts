@@ -4,6 +4,8 @@
  */
 import type { Evaluation, Quote, Profile, Metrics, NewsItem, PeerRow, SourceStatus, ProviderName, RatioPoint, AnnualRow, QuarterRow, Fundamentals, AnalystView, InsiderView, EarningsSurprise, EarningsCalendar } from "./analysis/types";
 import { platformEstimates } from "./providers/platforms";
+import { nasdaqEpsForecast } from "./providers/nasdaq";
+import { buildConsenso } from "./analysis/consenso";
 import { yahooQuote, yahooHistory, yahooFundamentals, yahooProfileFromSearch, yahooNews, yahooIndex, yahooSummary, type YahooFundamentals, type YahooSummary } from "./providers/yahoo";
 import { secAnnualHistory, secQuarterly } from "./providers/sec";
 import { finnhubEnabled, finnhubQuote, finnhubProfile, finnhubMetrics, finnhubPeers, finnhubRecommendation, finnhubInsiders, finnhubNews, finnhubEarnings, finnhubEarningsCalendar } from "./providers/finnhub";
@@ -247,7 +249,7 @@ export async function evaluate(raw: string): Promise<Evaluation> {
   }
 
   // 2) Todo lo demás en paralelo
-  const [prof, hist, sec, secQ, yf, ysum, fm, fpeers, rec, ins, fnews, earn, cal, pgNews, ynews, spx, tnx, plat, finra, wsb, cop] = await Promise.all([
+  const [prof, hist, sec, secQ, yf, ysum, fm, fpeers, rec, ins, fnews, earn, cal, pgNews, ynews, spx, tnx, plat, finra, wsb, cop, nq] = await Promise.all([
     settle(fh ? finnhubProfile(symbol) : skip<Profile>()),
     settle(yahooHistory(symbol)),
     settle(secAnnualHistory(symbol)),
@@ -270,6 +272,7 @@ export async function evaluate(raw: string): Promise<Evaluation> {
     settle(xoomarShortInterest(symbol)),
     settle(wsbSentiment(symbol)),
     settle(usdCop()),
+    settle(nasdaqEpsForecast(symbol)),
   ]);
   const ys = val(ysum);
   mark("yahoo", ysum.ok, ysum.ok ? "Perfil, analistas, earnings, insiders y estimaciones (quoteSummary)" : `quoteSummary: ${err(ysum)}`);
@@ -603,5 +606,6 @@ export async function evaluate(raw: string): Promise<Evaluation> {
     sources,
     warnings,
     complementos: { shortInterest: val(finra), wsb: val(wsb), usdCop: val(cop) },
+    consenso: buildConsenso({ annual: fundamentals.annual, yahoo: ys?.estimates.rango, nasdaq: val(nq) ?? [], price: quote.price, shares: profile.sharesOutstanding, monthly: history.monthly, usd: !foreignStatements }),
   };
 }

@@ -255,7 +255,7 @@ interface YSummary {
       financialData?: { financialCurrency?: string; targetMeanPrice?: Raw; targetHighPrice?: Raw; targetLowPrice?: Raw; recommendationKey?: string; recommendationMean?: Raw; numberOfAnalystOpinions?: Raw; returnOnEquity?: Raw; returnOnAssets?: Raw; grossMargins?: Raw; operatingMargins?: Raw; profitMargins?: Raw; revenueGrowth?: Raw; earningsGrowth?: Raw; totalCash?: Raw; totalDebt?: Raw; freeCashflow?: Raw; operatingCashflow?: Raw; currentRatio?: Raw; debtToEquity?: Raw; totalRevenue?: Raw; ebitda?: Raw };
       recommendationTrend?: { trend?: Array<{ period: string; strongBuy: number; buy: number; hold: number; sell: number; strongSell: number }> };
       calendarEvents?: { earnings?: { earningsDate?: Array<Raw>; earningsAverage?: Raw; revenueAverage?: Raw } };
-      earningsTrend?: { trend?: Array<{ period: string; growth?: Raw; earningsEstimate?: { avg?: Raw; growth?: Raw }; revenueEstimate?: { avg?: Raw; growth?: Raw } }> };
+      earningsTrend?: { trend?: Array<{ period: string; growth?: Raw; earningsEstimate?: { avg?: Raw; low?: Raw; high?: Raw; numberOfAnalysts?: Raw; growth?: Raw }; revenueEstimate?: { avg?: Raw; low?: Raw; high?: Raw; numberOfAnalysts?: Raw; growth?: Raw } }> };
       earningsHistory?: { history?: Array<{ quarter?: Raw; epsActual?: Raw; epsEstimate?: Raw; surprisePercent?: Raw }> };
       netSharePurchaseActivity?: { buyInfoCount?: Raw; sellInfoCount?: Raw; netInfoCount?: Raw; netPercentInsiderShares?: Raw; buyInfoShares?: Raw; sellInfoShares?: Raw };
       price?: { marketCap?: Raw; longName?: string; shortName?: string; exchangeName?: string; quoteType?: string };
@@ -301,7 +301,7 @@ export interface YahooSummary {
   nextEarnings: { date: string | null; epsEstimate: N; revenueEstimate: N };
   growth: { nextYear: N; next5y: N; currentYear: N }; // % estimados
   /** Consenso de analistas por año fiscal: 0 = año en curso, 1 = próximo. Crecimientos en %. */
-  estimates: { eps0: N; eps1: N; rev0: N; rev1: N; epsG0: N; epsG1: N; revG0: N; revG1: N };
+  estimates: { eps0: N; eps1: N; rev0: N; rev1: N; epsG0: N; epsG1: N; revG0: N; revG1: N; rango?: Array<{ rev: N; revLow: N; revHigh: N; revN: N; eps: N; epsLow: N; epsHigh: N; epsN: N }> };
   surprises: Array<{ period: string; actual: N; estimate: N; surprisePct: N }>;
   insiders: { pct: N; institutionsPct: N; buys: N; sells: N; netPct: N };
   shortPctFloat: N; // %
@@ -368,6 +368,11 @@ export async function yahooSummary(symbol: string): Promise<YahooSummary> {
           rev0: rv(t0?.revenueEstimate?.avg), rev1: rv(t1?.revenueEstimate?.avg),
           epsG0: pctOf(t0?.earningsEstimate?.growth), epsG1: pctOf(t1?.earningsEstimate?.growth),
           revG0: pctOf(t0?.revenueEstimate?.growth), revG1: pctOf(t1?.revenueEstimate?.growth),
+          // Rango y número de analistas de este año (0y) y el próximo (+1y), para la tabla de consenso
+          rango: [t0, t1].map((t) => ({
+            rev: rv(t?.revenueEstimate?.avg), revLow: rv(t?.revenueEstimate?.low), revHigh: rv(t?.revenueEstimate?.high), revN: rv(t?.revenueEstimate?.numberOfAnalysts),
+            eps: rv(t?.earningsEstimate?.avg), epsLow: rv(t?.earningsEstimate?.low), epsHigh: rv(t?.earningsEstimate?.high), epsN: rv(t?.earningsEstimate?.numberOfAnalysts),
+          })),
         };
       })(),
       surprises: (r.earningsHistory?.history ?? []).map((h) => ({ period: isNum(rv(h.quarter)) ? new Date((rv(h.quarter) as number) * 1000).toISOString().slice(0, 10) : "", actual: rv(h.epsActual), estimate: rv(h.epsEstimate), surprisePct: pctOf(h.surprisePercent) })),

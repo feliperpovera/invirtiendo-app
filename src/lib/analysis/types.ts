@@ -493,6 +493,8 @@ export interface Evaluation {
   warnings: string[];
   /** Datos de contexto de APIs públicas. Opcional: no entra al score ni al Fair Value. */
   complementos?: Complementos;
+  /** Histórico de 5 años + consenso de analistas por año fiscal (tabla y gráficas "Pasado y consenso"). */
+  consenso?: import("./consenso").ConsensoFila[];
 }
 
 export interface MarketPulse {

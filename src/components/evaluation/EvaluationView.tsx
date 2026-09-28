@@ -18,6 +18,7 @@ import { Financials } from "./Financials";
 import { RiskCard, PeersCard, NewsCard } from "./NewsPeers";
 import { AnalistasCard } from "./Analistas";
 import { PlanPanel } from "./PlanPanel";
+import { Consenso } from "./Consenso";
 
 const VERDICT_ES: Record<string, string> = { BUY: "Comprar por tramos", WATCHLIST: "Watchlist: esperar precio", REVIEW: "Faltan datos en algún pilar", DISCARD: "No cumple los pilares" };
 
@@ -154,6 +155,7 @@ export function EvaluationView({ ev }: { ev: Evaluation }) {
       <AnalistasCard v={ev.valuation} s={ev.sentiment} price={q.price} />
       <Checklist filters={buffett.filters} />
       <Financials ev={ev} />
+      {ev.consenso && <Consenso filas={ev.consenso} moneda={ev.profile.statementCurrency && ev.profile.statementCurrency !== "USD" ? ev.profile.statementCurrency : "USD"} />}
       <RiskCard risk={ev.risk} shortInterest={ev.complementos?.shortInterest} />
       <PeersCard peers={ev.peers} symbol={ev.symbol} />
       <NewsCard s={ev.sentiment} wsb={ev.complementos?.wsb} />
