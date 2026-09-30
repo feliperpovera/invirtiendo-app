@@ -203,7 +203,7 @@ export function PortafolioVsSP() {
   const [datos, setDatos] = useState<Datos | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [cargando, setCargando] = useState(true);
-  const [showBB, setShowBB] = useState(true);
+  const [showBB, setShowBB] = useState(false);
   const [showEma, setShowEma] = useState(true);
   const [ema200, setEma200] = useState<Array<{ t: number; e: number; i: number }> | null>(null);
   useEffect(() => {
@@ -312,9 +312,6 @@ export function PortafolioVsSP() {
         <>
           <div className="mt-3 flex flex-wrap items-center gap-2 text-[0.7rem] font-bold">
             <span className="font-normal text-ink-soft">Sobre el S&amp;P 500:</span>
-            <button type="button" aria-pressed={showBB} onClick={() => setShowBB(!showBB)} className={`rounded-full border px-2 py-0.5 ${showBB ? "border-terracotta" : "border-line text-ink-soft"}`}>
-              Bollinger (20, 2)
-            </button>
             <button type="button" aria-pressed={showEma} onClick={() => setShowEma(!showEma)} className={`rounded-full border px-2 py-0.5 ${showEma ? "border-ink" : "border-line text-ink-soft"}`}>
               <span className="mr-1 inline-block h-0.5 w-3 align-middle" style={{ background: "var(--olive)" }} />EMA 200
             </button>

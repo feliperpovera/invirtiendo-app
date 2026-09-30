@@ -43,7 +43,7 @@ export function PriceFairValueChart({
 }) {
   const [range, setRange] = useState<RangeKey>("2A");
   const [hover, setHover] = useState<number | null>(null);
-  const [showBB, setShowBB] = useState(true);
+  const [showBB, setShowBB] = useState(false);
   const [showEma, setShowEma] = useState(true);
   const W = 1000;
   const H = height;
@@ -415,9 +415,6 @@ export function PriceFairValueChart({
             <span className="w-4 border-t-2 border-dotted" style={{ borderColor: "var(--terracotta)" }} /> Analistas {fmtMoney(fv.targetAnalyst)}
           </span>
         )}
-        <button type="button" aria-pressed={showBB} onClick={() => setShowBB(!showBB)} className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[0.7rem] font-bold ${showBB ? "border-terracotta" : "border-line text-ink-soft"}`}>
-          <span className="w-4 h-2 rounded-sm" style={{ background: "var(--terracotta)", opacity: showBB ? 0.35 : 0.15 }} /> Bollinger (20, 2)
-        </button>
         <button type="button" aria-pressed={showEma} onClick={() => setShowEma(!showEma)} className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[0.7rem] font-bold ${showEma ? "border-ink" : "border-line text-ink-soft"}`}>
           <span className="w-4 h-0.5 rounded" style={{ background: "var(--terracotta)" }} />EMA 200
         </button>
