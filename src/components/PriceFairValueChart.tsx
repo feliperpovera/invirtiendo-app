@@ -328,7 +328,7 @@ export function PriceFairValueChart({
           )}
           {showEma && (
             <>
-              <path d={seriePath(ind.e200)} fill="none" stroke="var(--ink)" strokeWidth="1.5" strokeDasharray="5 3" vectorEffect="non-scaling-stroke" opacity="0.75" />
+              <path d={seriePath(ind.e200)} fill="none" stroke="var(--terracotta)" strokeWidth="2.5" vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
             </>
           )}
           <path d={line(pricePts)} fill="none" stroke="var(--ink)" strokeWidth="2" vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
@@ -419,7 +419,7 @@ export function PriceFairValueChart({
           <span className="w-4 h-2 rounded-sm" style={{ background: "var(--terracotta)", opacity: showBB ? 0.35 : 0.15 }} /> Bollinger (20, 2)
         </button>
         <button type="button" aria-pressed={showEma} onClick={() => setShowEma(!showEma)} className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[0.7rem] font-bold ${showEma ? "border-ink" : "border-line text-ink-soft"}`}>
-          <span className="w-3 border-t-2 border-dashed" style={{ borderColor: "var(--ink)" }} />EMA 200
+          <span className="w-4 h-0.5 rounded" style={{ background: "var(--terracotta)" }} />EMA 200
         </button>
         {earn.length > 0 && <span className="text-ink-soft">R = resultados</span>}
         {divs.length > 0 && <span className="text-ink-soft">D = dividendo</span>}

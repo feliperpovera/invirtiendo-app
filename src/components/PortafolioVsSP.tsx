@@ -54,7 +54,7 @@ function useAncho() {
   return { ref, w };
 }
 
-function Grafico({ d, showBB, showEma }: { d: Datos; showBB: boolean; showEma: boolean }) {
+function Grafico({ d, showBB, showEma, ema200 }: { d: Datos; showBB: boolean; showEma: boolean; ema200: Array<{ t: number; e: number; i: number }> | null }) {
   const { ref, w } = useAncho();
   const [hover, setHover] = useState<number | null>(null);
   const H = w < 480 ? 220 : 280;
@@ -63,8 +63,22 @@ function Grafico({ d, showBB, showEma }: { d: Datos; showBB: boolean; showEma: b
   // Indicadores sobre la línea del S&P 500 (base 100), en los períodos del gráfico; una EMA solo se dibuja si hay más puntos que su período.
   const cierres = pts.map((p) => p.indice);
   const bb = bollinger(cierres);
-  const emas = ([[200, "var(--ink)", "5 3"]] as const).filter(([k]) => pts.length > k).map(([k, color, dash]) => ({ k, color, dash, v: ema(cierres, k) }));
-  const valores = pts.flatMap((p, i) => [...(p.portafolio === null ? [p.indice] : [p.indice, p.portafolio]), ...(showBB && bb[i] ? [bb[i]!.up, bb[i]!.dn] : [])]);
+  // EMA 200 diaria: se calcula sobre 5 años de S&P (así existe en cualquier periodo) y se lleva a la base 100 de este rango.
+  const emaSerie = (() => {
+    if (!ema200?.length || d.rango === "1D" || !pts.length) return null;
+    const en = (t: number) => {
+      let r: (typeof ema200)[number] | null = null;
+      for (const q of ema200) if (q.t <= t + 12 * 3600000) r = q;
+      return r;
+    };
+    const base = en(pts[0].t);
+    if (!base) return null;
+    return pts.map((p) => {
+      const q = en(p.t);
+      return q ? (q.e * 100) / base.i : null;
+    });
+  })();
+  const valores = pts.flatMap((p, i) => [...(p.portafolio === null ? [p.indice] : [p.indice, p.portafolio]), ...(showBB && bb[i] ? [bb[i]!.up, bb[i]!.dn] : []), ...(showEma && emaSerie?.[i] != null ? [emaSerie[i]!] : [])]);
   let min = Math.min(100, ...valores);
   let max = Math.max(100, ...valores);
   const margen = (max - min) * 0.08 || 1;
@@ -141,7 +155,7 @@ function Grafico({ d, showBB, showEma }: { d: Datos; showBB: boolean; showEma: b
               <path d={serie(bb.map((b) => b?.dn))} fill="none" stroke="var(--terracotta)" strokeWidth="1" opacity="0.7" />
             </>
           )}
-          {showEma && emas.map((e) => <path key={e.k} d={serie(e.v)} fill="none" stroke={e.color} strokeWidth="1.5" strokeDasharray={e.dash} opacity="0.8" />)}
+          {showEma && emaSerie && <path d={serie(emaSerie)} fill="none" stroke="var(--olive)" strokeWidth="2.5" strokeLinejoin="round" />}
           <path d={linea("indice")} fill="none" stroke="var(--ink-soft)" strokeWidth="2" strokeLinejoin="round" />
           <path d={linea("portafolio")} fill="none" stroke="var(--terracotta)" strokeWidth="3" strokeLinejoin="round" />
           <circle cx={x(pts.length - 1)} cy={y(ult.indice)} r="3.5" fill="var(--ink-soft)" />
@@ -191,6 +205,17 @@ export function PortafolioVsSP() {
   const [cargando, setCargando] = useState(true);
   const [showBB, setShowBB] = useState(true);
   const [showEma, setShowEma] = useState(true);
+  const [ema200, setEma200] = useState<Array<{ t: number; e: number; i: number }> | null>(null);
+  useEffect(() => {
+    fetch("/api/portafolio?rango=5A")
+      .then((r) => r.json())
+      .then((j: Datos) => {
+        const v = j.puntos.map((p) => p.indice);
+        const e = ema(v, 200);
+        setEma200(j.puntos.map((p, k) => ({ t: p.t, e: e[k], i: v[k] })));
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     let vivo = true;
@@ -275,7 +300,7 @@ export function PortafolioVsSP() {
 
       {d ? (
         <div className={`transition-opacity ${atenuado ? "opacity-60" : ""}`} aria-busy={atenuado}>
-          <Grafico d={d} showBB={showBB} showEma={showEma} />
+          <Grafico d={d} showBB={showBB} showEma={showEma} ema200={ema200} />
         </div>
       ) : error ? (
         <div className="mt-4 flex h-[220px] items-center justify-center rounded-xl bg-cream-2/60 text-sm text-ink-soft sm:h-[280px]">No pude leer el mercado: {error}</div>
@@ -291,7 +316,7 @@ export function PortafolioVsSP() {
               Bollinger (20, 2)
             </button>
             <button type="button" aria-pressed={showEma} onClick={() => setShowEma(!showEma)} className={`rounded-full border px-2 py-0.5 ${showEma ? "border-ink" : "border-line text-ink-soft"}`}>
-              EMA 200
+              <span className="mr-1 inline-block h-0.5 w-3 align-middle" style={{ background: "var(--olive)" }} />EMA 200
             </button>
           </div>
           <div className="mt-4 flex flex-wrap gap-1.5">
