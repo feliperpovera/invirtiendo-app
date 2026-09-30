@@ -18,6 +18,23 @@ const RANGES: Array<{ k: RangeKey; years: number }> = [
   { k: "10A", years: 10 },
 ];
 
+/** EMA de k períodos (semilla: primer cierre). */
+const ema = (c: number[], k: number) => {
+  const a = 2 / (k + 1);
+  const out: number[] = [];
+  c.forEach((v, i) => out.push(i ? v * a + out[i - 1] * (1 - a) : v));
+  return out;
+};
+/** Bandas de Bollinger: media móvil simple de n períodos ± m desviaciones estándar (null hasta tener n datos). */
+const bollinger = (c: number[], n = 20, m = 2) =>
+  c.map((_, i) => {
+    if (i < n - 1) return null;
+    const w = c.slice(i - n + 1, i + 1);
+    const mid = w.reduce((x, y) => x + y, 0) / n;
+    const sd = Math.sqrt(w.reduce((x, y) => x + (y - mid) ** 2, 0) / n);
+    return { mid, up: mid + m * sd, dn: mid - m * sd };
+  });
+
 const fmtDay = (t: number) => {
   const d = new Date(t);
   return `${d.getDate()} ${MES[d.getMonth()]} ${d.getFullYear()}`;
@@ -42,6 +59,8 @@ export function PriceFairValueChart({
 }) {
   const [range, setRange] = useState<RangeKey>("2A");
   const [hover, setHover] = useState<number | null>(null);
+  const [showBB, setShowBB] = useState(true);
+  const [showEma, setShowEma] = useState(true);
   const W = 1000;
   const H = height;
   const PAD = { t: 20, r: 96, b: 30, l: 8 };
@@ -50,8 +69,17 @@ export function PriceFairValueChart({
     const years = RANGES.find((r) => r.k === range)!.years;
     const from = asOf - years * 365 * 86400000;
     const src = years <= 2 ? history.daily : years <= 5 ? history.weekly : history.monthly;
-    const price = (src.length ? src : history.daily).filter((p) => p.t >= from);
+    const all = src.length ? src : history.daily;
+    // Indicadores sobre toda la serie (así arrancan llenos en el borde izquierdo) y luego se recorta al rango
+    const closes = all.map((p) => p.c);
+    const e20 = ema(closes, 20);
+    const e50 = ema(closes, 50);
+    const e200 = ema(closes, 200);
+    const bb = bollinger(closes);
+    const first = all.findIndex((p) => p.t >= from);
+    const price = first < 0 ? [] : all.slice(first);
     if (price.length < 5) return null;
+    const ind = { e20: e20.slice(first), e50: e50.slice(first), e200: e200.slice(first), bb: bb.slice(first) };
 
     const t0 = price[0].t;
     // La proyección ocupa como mucho la mitad del rango visible: en 1M no se estira 12 meses
@@ -59,6 +87,7 @@ export function PriceFairValueChart({
     const t1 = fv ? Math.min(fv.targetDate, asOf + span * 0.5) : price[price.length - 1].t;
     const fvPts = (fv?.points ?? []).filter((p) => p.t >= t0 - 120 * 86400000);
     const ys: number[] = [...price.map((p) => p.c), current];
+    if (showBB) for (const b of ind.bb) if (b) ys.push(b.up, b.dn);
     for (const p of fvPts) ys.push(p.lo, p.hi);
     if (fv) {
       if (isNum(fv.fairValueNow)) ys.push(fv.fairValueNow);
@@ -72,8 +101,8 @@ export function PriceFairValueChart({
     const yMax = hi + pad;
     const X = (t: number) => PAD.l + ((t - t0) / (t1 - t0 || 1)) * (W - PAD.l - PAD.r);
     const Y = (v: number) => PAD.t + (1 - (v - yMin) / (yMax - yMin || 1)) * (H - PAD.t - PAD.b);
-    return { price, fvPts, t0, t1, yMin, yMax, X, Y, years };
-  }, [history, fv, current, asOf, range, H, PAD.l, PAD.r, PAD.t, PAD.b, W]);
+    return { price, ind, fvPts, t0, t1, yMin, yMax, X, Y, years };
+  }, [history, fv, current, asOf, range, showBB, H, PAD.l, PAD.r, PAD.t, PAD.b, W]);
 
   const selector = (
     <div className="flex flex-wrap gap-1" role="group" aria-label="Rango del gráfico">
@@ -99,10 +128,22 @@ export function PriceFairValueChart({
       </div>
     );
   }
-  const { price, fvPts, t0, t1, yMin, yMax, X, Y, years } = model;
+  const { price, ind, fvPts, t0, t1, yMin, yMax, X, Y, years } = model;
 
   const line = (pts: Array<{ x: number; y: number }>) => pts.map((p, i) => `${i ? "L" : "M"}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
   const pricePts = price.map((p) => ({ x: X(p.t), y: Y(p.c), t: p.t, c: p.c }));
+  const seriePath = (vals: Array<number | null | undefined>) => {
+    let d = "";
+    vals.forEach((v, i) => {
+      if (v == null) return;
+      d += `${d ? "L" : "M"}${pricePts[i].x.toFixed(1)},${Y(v).toFixed(1)}`;
+    });
+    return d;
+  };
+  const bbIdx = ind.bb.map((b, i) => (b ? i : -1)).filter((i) => i >= 0);
+  const bbBand = bbIdx.length > 1
+    ? `${bbIdx.map((i, k) => `${k ? "L" : "M"}${pricePts[i].x.toFixed(1)},${Y(ind.bb[i]!.up).toFixed(1)}`).join("")}${[...bbIdx].reverse().map((i) => `L${pricePts[i].x.toFixed(1)},${Y(ind.bb[i]!.dn).toFixed(1)}`).join("")}Z`
+    : "";
 
   // Fair Value escalonado + banda de confianza
   let fvPath = "";
@@ -296,6 +337,20 @@ export function PriceFairValueChart({
             </>
           )}
 
+          {showBB && bbBand && (
+            <>
+              <path d={bbBand} fill="var(--terracotta)" opacity="0.09" />
+              <path d={seriePath(ind.bb.map((b) => b?.up))} fill="none" stroke="var(--terracotta)" strokeWidth="1" vectorEffect="non-scaling-stroke" opacity="0.7" />
+              <path d={seriePath(ind.bb.map((b) => b?.dn))} fill="none" stroke="var(--terracotta)" strokeWidth="1" vectorEffect="non-scaling-stroke" opacity="0.7" />
+            </>
+          )}
+          {showEma && (
+            <>
+              <path d={seriePath(ind.e200)} fill="none" stroke="var(--ink)" strokeWidth="1.5" strokeDasharray="5 3" vectorEffect="non-scaling-stroke" opacity="0.75" />
+              <path d={seriePath(ind.e50)} fill="none" stroke="var(--olive)" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
+              <path d={seriePath(ind.e20)} fill="none" stroke="var(--terracotta)" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
+            </>
+          )}
           <path d={line(pricePts)} fill="none" stroke="var(--ink)" strokeWidth="2" vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
           <line x1={now} x2={now} y1={PAD.t} y2={H - PAD.b} stroke="var(--ink-soft)" strokeWidth="1.5" strokeDasharray="4 4" vectorEffect="non-scaling-stroke" />
           <circle cx={now} cy={Y(current)} r="4.5" fill="var(--ink)" />
@@ -380,6 +435,12 @@ export function PriceFairValueChart({
             <span className="w-4 border-t-2 border-dotted" style={{ borderColor: "var(--terracotta)" }} /> Analistas {fmtMoney(fv.targetAnalyst)}
           </span>
         )}
+        <button type="button" aria-pressed={showBB} onClick={() => setShowBB(!showBB)} className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[0.7rem] font-bold ${showBB ? "border-terracotta" : "border-line text-ink-soft"}`}>
+          <span className="w-4 h-2 rounded-sm" style={{ background: "var(--terracotta)", opacity: showBB ? 0.35 : 0.15 }} /> Bollinger (20, 2)
+        </button>
+        <button type="button" aria-pressed={showEma} onClick={() => setShowEma(!showEma)} className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[0.7rem] font-bold ${showEma ? "border-ink" : "border-line text-ink-soft"}`}>
+          <span className="w-3 h-0.5" style={{ background: "var(--terracotta)" }} />EMA 20 <span className="w-3 h-0.5" style={{ background: "var(--olive)" }} />EMA 50 <span className="w-3 border-t-2 border-dashed" style={{ borderColor: "var(--ink)" }} />EMA 200
+        </button>
         {earn.length > 0 && <span className="text-ink-soft">R = resultados</span>}
         {divs.length > 0 && <span className="text-ink-soft">D = dividendo</span>}
       </div>
