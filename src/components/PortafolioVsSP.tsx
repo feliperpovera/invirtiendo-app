@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Card, Eyebrow } from "./ui";
 import { fmtPct, isNum } from "@/lib/format";
 import { RANGOS, type Rango } from "@/lib/analysis/portafolio";
+import { ema, bollinger } from "@/lib/indicadores";
 
 interface Datos {
   rango: Rango;
@@ -53,13 +54,17 @@ function useAncho() {
   return { ref, w };
 }
 
-function Grafico({ d }: { d: Datos }) {
+function Grafico({ d, showBB, showEma }: { d: Datos; showBB: boolean; showEma: boolean }) {
   const { ref, w } = useAncho();
   const [hover, setHover] = useState<number | null>(null);
   const H = w < 480 ? 220 : 280;
   const pad = { l: 44, r: 14, t: 14, b: 26 };
   const pts = d.puntos;
-  const valores = pts.flatMap((p) => (p.portafolio === null ? [p.indice] : [p.indice, p.portafolio]));
+  // Indicadores sobre la línea del S&P 500 (base 100), en los períodos del gráfico; una EMA solo se dibuja si hay más puntos que su período.
+  const cierres = pts.map((p) => p.indice);
+  const bb = bollinger(cierres);
+  const emas = ([[20, "var(--terracotta)", undefined], [50, "var(--olive)", undefined], [200, "var(--ink)", "5 3"]] as const).filter(([k]) => pts.length > k).map(([k, color, dash]) => ({ k, color, dash, v: ema(cierres, k) }));
+  const valores = pts.flatMap((p, i) => [...(p.portafolio === null ? [p.indice] : [p.indice, p.portafolio]), ...(showBB && bb[i] ? [bb[i]!.up, bb[i]!.dn] : [])]);
   let min = Math.min(100, ...valores);
   let max = Math.max(100, ...valores);
   const margen = (max - min) * 0.08 || 1;
@@ -79,6 +84,9 @@ function Grafico({ d }: { d: Datos }) {
     });
     return d;
   };
+  const serie = (vals: Array<number | null | undefined>) => vals.reduce<string>((d, v, i) => (v == null ? d : `${d}${d ? "L" : "M"}${x(i).toFixed(1)},${y(v).toFixed(1)}`), "");
+  const bbIdx = bb.map((b, i) => (b ? i : -1)).filter((i) => i >= 0);
+  const bbBanda = bbIdx.length > 1 ? `${bbIdx.map((i, k) => `${k ? "L" : "M"}${x(i).toFixed(1)},${y(bb[i]!.up).toFixed(1)}`).join("")}${[...bbIdx].reverse().map((i) => `L${x(i).toFixed(1)},${y(bb[i]!.dn).toFixed(1)}`).join("")}Z` : "";
   const iInicio = d.inicioPortafolio !== null ? pts.findIndex((p) => p.portafolio !== null) : -1;
 
   // Marcas del eje en % redondos (base 100 = 0%)
@@ -126,6 +134,14 @@ function Grafico({ d }: { d: Datos }) {
               {fecha(pts[i].t, d.rango, false, anual)}
             </text>
           ))}
+          {showBB && bbBanda && (
+            <>
+              <path d={bbBanda} fill="var(--terracotta)" opacity="0.09" />
+              <path d={serie(bb.map((b) => b?.up))} fill="none" stroke="var(--terracotta)" strokeWidth="1" opacity="0.7" />
+              <path d={serie(bb.map((b) => b?.dn))} fill="none" stroke="var(--terracotta)" strokeWidth="1" opacity="0.7" />
+            </>
+          )}
+          {showEma && emas.map((e) => <path key={e.k} d={serie(e.v)} fill="none" stroke={e.color} strokeWidth="1.5" strokeDasharray={e.dash} opacity="0.8" />)}
           <path d={linea("indice")} fill="none" stroke="var(--ink-soft)" strokeWidth="2" strokeLinejoin="round" />
           <path d={linea("portafolio")} fill="none" stroke="var(--terracotta)" strokeWidth="3" strokeLinejoin="round" />
           <circle cx={x(pts.length - 1)} cy={y(ult.indice)} r="3.5" fill="var(--ink-soft)" />
@@ -173,6 +189,8 @@ export function PortafolioVsSP() {
   const [datos, setDatos] = useState<Datos | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [cargando, setCargando] = useState(true);
+  const [showBB, setShowBB] = useState(true);
+  const [showEma, setShowEma] = useState(true);
 
   useEffect(() => {
     let vivo = true;
@@ -257,7 +275,7 @@ export function PortafolioVsSP() {
 
       {d ? (
         <div className={`transition-opacity ${atenuado ? "opacity-60" : ""}`} aria-busy={atenuado}>
-          <Grafico d={d} />
+          <Grafico d={d} showBB={showBB} showEma={showEma} />
         </div>
       ) : error ? (
         <div className="mt-4 flex h-[220px] items-center justify-center rounded-xl bg-cream-2/60 text-sm text-ink-soft sm:h-[280px]">No pude leer el mercado: {error}</div>
@@ -267,6 +285,15 @@ export function PortafolioVsSP() {
 
       {d && (
         <>
+          <div className="mt-3 flex flex-wrap items-center gap-2 text-[0.7rem] font-bold">
+            <span className="font-normal text-ink-soft">Sobre el S&amp;P 500:</span>
+            <button type="button" aria-pressed={showBB} onClick={() => setShowBB(!showBB)} className={`rounded-full border px-2 py-0.5 ${showBB ? "border-terracotta" : "border-line text-ink-soft"}`}>
+              Bollinger (20, 2)
+            </button>
+            <button type="button" aria-pressed={showEma} onClick={() => setShowEma(!showEma)} className={`rounded-full border px-2 py-0.5 ${showEma ? "border-ink" : "border-line text-ink-soft"}`}>
+              EMA 20 · 50 · 200
+            </button>
+          </div>
           <div className="mt-4 flex flex-wrap gap-1.5">
             {d.pesos.map((p) => (
               <span key={p.ticker} className="pill border border-line text-ink">
