@@ -63,7 +63,7 @@ function Grafico({ d, showBB, showEma }: { d: Datos; showBB: boolean; showEma: b
   // Indicadores sobre la línea del S&P 500 (base 100), en los períodos del gráfico; una EMA solo se dibuja si hay más puntos que su período.
   const cierres = pts.map((p) => p.indice);
   const bb = bollinger(cierres);
-  const emas = ([[20, "var(--terracotta)", undefined], [50, "var(--olive)", undefined], [200, "var(--ink)", "5 3"]] as const).filter(([k]) => pts.length > k).map(([k, color, dash]) => ({ k, color, dash, v: ema(cierres, k) }));
+  const emas = ([[200, "var(--ink)", "5 3"]] as const).filter(([k]) => pts.length > k).map(([k, color, dash]) => ({ k, color, dash, v: ema(cierres, k) }));
   const valores = pts.flatMap((p, i) => [...(p.portafolio === null ? [p.indice] : [p.indice, p.portafolio]), ...(showBB && bb[i] ? [bb[i]!.up, bb[i]!.dn] : [])]);
   let min = Math.min(100, ...valores);
   let max = Math.max(100, ...valores);
@@ -291,7 +291,7 @@ export function PortafolioVsSP() {
               Bollinger (20, 2)
             </button>
             <button type="button" aria-pressed={showEma} onClick={() => setShowEma(!showEma)} className={`rounded-full border px-2 py-0.5 ${showEma ? "border-ink" : "border-line text-ink-soft"}`}>
-              EMA 20 · 50 · 200
+              EMA 200
             </button>
           </div>
           <div className="mt-4 flex flex-wrap gap-1.5">

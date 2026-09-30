@@ -56,14 +56,12 @@ export function PriceFairValueChart({
     const all = src.length ? src : history.daily;
     // Indicadores sobre toda la serie (así arrancan llenos en el borde izquierdo) y luego se recorta al rango
     const closes = all.map((p) => p.c);
-    const e20 = ema(closes, 20);
-    const e50 = ema(closes, 50);
     const e200 = ema(closes, 200);
     const bb = bollinger(closes);
     const first = all.findIndex((p) => p.t >= from);
     const price = first < 0 ? [] : all.slice(first);
     if (price.length < 5) return null;
-    const ind = { e20: e20.slice(first), e50: e50.slice(first), e200: e200.slice(first), bb: bb.slice(first) };
+    const ind = { e200: e200.slice(first), bb: bb.slice(first) };
 
     const t0 = price[0].t;
     // La proyección ocupa como mucho la mitad del rango visible: en 1M no se estira 12 meses
@@ -331,8 +329,6 @@ export function PriceFairValueChart({
           {showEma && (
             <>
               <path d={seriePath(ind.e200)} fill="none" stroke="var(--ink)" strokeWidth="1.5" strokeDasharray="5 3" vectorEffect="non-scaling-stroke" opacity="0.75" />
-              <path d={seriePath(ind.e50)} fill="none" stroke="var(--olive)" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
-              <path d={seriePath(ind.e20)} fill="none" stroke="var(--terracotta)" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
             </>
           )}
           <path d={line(pricePts)} fill="none" stroke="var(--ink)" strokeWidth="2" vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
@@ -423,7 +419,7 @@ export function PriceFairValueChart({
           <span className="w-4 h-2 rounded-sm" style={{ background: "var(--terracotta)", opacity: showBB ? 0.35 : 0.15 }} /> Bollinger (20, 2)
         </button>
         <button type="button" aria-pressed={showEma} onClick={() => setShowEma(!showEma)} className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[0.7rem] font-bold ${showEma ? "border-ink" : "border-line text-ink-soft"}`}>
-          <span className="w-3 h-0.5" style={{ background: "var(--terracotta)" }} />EMA 20 <span className="w-3 h-0.5" style={{ background: "var(--olive)" }} />EMA 50 <span className="w-3 border-t-2 border-dashed" style={{ borderColor: "var(--ink)" }} />EMA 200
+          <span className="w-3 border-t-2 border-dashed" style={{ borderColor: "var(--ink)" }} />EMA 200
         </button>
         {earn.length > 0 && <span className="text-ink-soft">R = resultados</span>}
         {divs.length > 0 && <span className="text-ink-soft">D = dividendo</span>}
