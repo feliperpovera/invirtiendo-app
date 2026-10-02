@@ -18,6 +18,7 @@ import { Financials } from "./Financials";
 import { RiskCard, PeersCard, NewsCard } from "./NewsPeers";
 import { AnalistasCard } from "./Analistas";
 import { PlanPanel } from "./PlanPanel";
+import { TickerLogo } from "@/components/TickerLogo";
 import { Consenso } from "./Consenso";
 
 const VERDICT_ES: Record<string, string> = { BUY: "Comprar por tramos", WATCHLIST: "Watchlist: esperar precio", REVIEW: "Faltan datos en algún pilar", DISCARD: "No cumple los pilares" };
@@ -51,7 +52,8 @@ export function EvaluationView({ ev }: { ev: Evaluation }) {
             <Eyebrow>{ev.profile.industry || ev.profile.sector || "Acción"}</Eyebrow>
             <span className={`pill ${ev.risk.profile === "nucleo" ? "bg-olive-tint text-olive-deep" : "bg-terracotta-tint text-terracotta-deep"}`}>{ev.risk.profile === "nucleo" ? "Núcleo" : "Satélite"}</span>
           </div>
-          <h1 className="font-display text-4xl sm:text-5xl mt-1 leading-[0.95]">
+          <h1 className="font-display text-4xl sm:text-5xl mt-1 leading-[0.95] flex flex-wrap items-center gap-x-3">
+            <TickerLogo symbol={ev.symbol} size={56} />
             {ev.symbol} <span className="text-ink-soft text-2xl align-middle">· {ev.profile.name}</span>
           </h1>
           <div className="mt-3 flex flex-wrap items-end gap-x-6 gap-y-2">

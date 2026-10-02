@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { TickerLogo } from "./TickerLogo";
 
 interface Hit {
   symbol: string;
@@ -113,6 +114,7 @@ export function SearchBox({ compact = false, autoFocus = false, onSelect, placeh
                 onClick={() => go(h.symbol)}
                 className={`w-full flex items-center gap-3 px-4 py-2.5 text-left ${i === idx ? "bg-terracotta-tint" : ""}`}
               >
+                <TickerLogo symbol={h.symbol} size={28} />
                 <span className="font-bold tabular w-16 shrink-0">{h.symbol}</span>
                 <span className="flex-1 truncate text-sm">{h.name}</span>
                 <span className="text-xs text-ink-soft shrink-0">{h.type === "ETF" ? "ETF" : h.exchange}</span>
