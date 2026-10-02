@@ -7,6 +7,40 @@ import type { Quote } from "@/lib/analysis/types";
 import { fmtMoney, fmtPct, fmtBig, isNum, timeAgo } from "@/lib/format";
 import { Card, Eyebrow, SignalPill, Delta } from "./ui";
 import { RangeBar } from "@/components/charts";
+import { signalFor } from "@/lib/analysis/score";
+
+/**
+ * El Fair Value y las zonas guardados al agregar una acción envejecen: cada visita los refresca del
+ * Ranking (motor actual, al día) o, si la acción no está ahí, de su evaluación completa (una a la vez).
+ */
+function useRefrescarFv(items: WatchItem[], upsert: (i: Partial<WatchItem> & { symbol: string }) => void) {
+  const key = items.map((i) => i.symbol).join(",");
+  useEffect(() => {
+    if (!key) return;
+    let vivo = true;
+    (async () => {
+      const guardar = (symbol: string, fv: number | null, fiable: boolean, extra: Partial<WatchItem> = {}) =>
+        vivo && upsert({ symbol, fairValue: fv, zoneGradual: fv ? fv * 0.85 : null, zoneStrong: fv ? fv * 0.75 : null, fvFiable: fiable, fvAt: Date.now(), ...extra });
+      const rk = await fetch("/api/ranking").then((r) => r.json()).catch(() => ({ filas: [] }));
+      const filas = new Map<string, { fair_value: number | null; mos: number | null; senal_key: string; score: number }>((rk.filas ?? []).map((f: { ticker: string }) => [f.ticker, f]));
+      for (const symbol of key.split(",")) {
+        const f = filas.get(symbol);
+        if (f) {
+          guardar(symbol, f.fair_value, !(f.senal_key === "watch" && isNum(f.mos) && f.mos >= 15), { score: f.score });
+          continue;
+        }
+        const ev = await fetch(`/api/stock/${encodeURIComponent(symbol)}`).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+        if (!ev) continue;
+        const fv = ev.valuation?.intrinsic?.blended ?? null;
+        guardar(symbol, fv, !(ev.score?.signal?.key === "watch" && isNum(ev.valuation?.marginOfSafety) && ev.valuation.marginOfSafety >= 15), { score: ev.score?.total, buffettPassed: ev.buffett?.passed });
+      }
+    })();
+    return () => {
+      vivo = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+}
 
 function useQuotes(symbols: string[]) {
   const [q, setQ] = useState<Record<string, Quote | null>>({});
@@ -77,6 +111,8 @@ function Row({ it, q, onRemove, onAddLot, onRemoveLot }: { it: WatchItem; q: Quo
   const st = positionStats(it.lots, price);
   const distGradual = isNum(price) && isNum(it.zoneGradual) ? (it.zoneGradual / price - 1) * 100 : null;
   const inZone = isNum(distGradual) && distGradual >= 0;
+  // Señal en vivo: mismas reglas del motor con el precio de este minuto
+  const sig = isNum(price) && isNum(it.fairValue) ? signalFor((it.fairValue / price - 1) * 100, false, it.fvFiable !== false) : it.signal && it.signalLabel ? { key: it.signal, label: it.signalLabel } : null;
   return (
     <>
       <tr className={inZone ? "bg-olive-tint/60" : ""}>
@@ -98,7 +134,7 @@ function Row({ it, q, onRemove, onAddLot, onRemoveLot }: { it: WatchItem; q: Quo
         <td>
           <RangeBar label="52 sem" low={q?.low52 ?? null} high={q?.high52 ?? null} price={price} compact />
         </td>
-        <td>{it.signal && it.signalLabel ? <SignalPill k={it.signal} label={it.signalLabel} /> : <span className="text-ink-soft">—</span>}</td>
+        <td>{sig ? <SignalPill k={sig.key} label={sig.label} /> : <span className="text-ink-soft">—</span>}</td>
         <td className="num">
           {fmtMoney(it.fairValue)}
           <div className="text-xs text-ink-soft">zona {fmtMoney(it.zoneGradual, 0)} · fuerte {fmtMoney(it.zoneStrong, 0)}</div>
@@ -186,7 +222,8 @@ function Row({ it, q, onRemove, onAddLot, onRemoveLot }: { it: WatchItem; q: Quo
 }
 
 export function WatchlistTable({ preview = false }: { preview?: boolean }) {
-  const { items, ready, remove, addLot, removeLot } = useWatchlist();
+  const { items, ready, remove, addLot, removeLot, upsert } = useWatchlist();
+  useRefrescarFv(items, upsert);
   const symbols = useMemo(() => items.map((i) => i.symbol), [items]);
   const { quotes, asOf } = useQuotes(symbols);
   const [msg, setMsg] = useState<string | null>(null);

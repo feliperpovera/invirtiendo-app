@@ -25,6 +25,10 @@ export interface WatchItem {
   zoneStrong: number | null;
   signal?: SignalKey;
   signalLabel?: string;
+  /** false = las fuentes del Fair Value se contradicen (compuerta de dispersión): la señal no pasa de Watch. */
+  fvFiable?: boolean;
+  /** Cuándo se refrescó el Fair Value desde el motor (ms). */
+  fvAt?: number;
   score?: number;
   buffettPassed?: number;
   profile?: "nucleo" | "satelite";
