@@ -17,6 +17,7 @@ const links = [
   { href: "/ranking", label: "Ranking" },
   { href: "/watchlist", label: "Watchlist" },
   { href: "/simulador", label: "Simulador" },
+  { href: "/radar", label: "Radar del Poder" },
   { href: "/noticias", label: "Noticias" },
 ];
 
