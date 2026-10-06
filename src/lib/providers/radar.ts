@@ -8,8 +8,21 @@ import { getDocumentProxy } from "unpdf";
  * - Donald Trump: OGE Form 278-T, PDF escaneado con OCR; los nombres se emparejan con la lista de la SEC.
  * Un job semanal (`/api/cron/radar`) lo recalcula y lo guarda en la tabla `radar_poder`.
  */
-export type Persona = "thiel" | "berkshire" | "pelosi" | "trump";
-export interface Movimiento { ticker: string; nombre: string; veces: number; ultima: string }
+export type Persona = string;
+/** montoMin/montoMax: suma de los rangos que exige el reporte (Pelosi y Trump declaran rangos, no montos exactos). */
+export interface Movimiento { ticker: string; nombre: string; veces: number; ultima: string; montoMin?: number; montoMax?: number }
+
+/** Grandes fondos con 13F en EDGAR (CIK verificado en la búsqueda de la SEC). */
+export const FONDOS: Array<{ persona: Persona; cik: number }> = [
+  { persona: "thiel", cik: 1562087 },
+  { persona: "berkshire", cik: 1067983 },
+  { persona: "ackman", cik: 1336528 },
+  { persona: "druckenmiller", cik: 1536411 },
+  { persona: "dalio", cik: 1350694 },
+  { persona: "wood", cik: 1697748 },
+  { persona: "tepper", cik: 1656456 },
+  { persona: "soros", cik: 1029160 },
+];
 export interface Posicion { ticker: string | null; nombre: string; peso: number; cambio: "nueva" | "aumentó" | "redujo" | "igual"; cambioPct: number | null }
 export interface PerfilRadar {
   persona: Persona;
@@ -48,11 +61,16 @@ export function aTicker(m: Map<string, string>, nombre: string): string | null {
   // del nombre completo hacia atrás: "NVIDIA" encuentra "NVIDIA" aunque el OCR agregue basura al final
   for (let n = w.length; n >= 1; n--) {
     const k = w.slice(0, n).join(" ");
-    if (n === 1 && k.length < 4) break;
+    if (n === 1 && k.length < 4 && w.length > 1) break; // "SLM" sí, si el nombre es solo eso
     const t = m.get(k);
     if (t) return t;
   }
-  return null;
+  // Nombre truncado del 13F ("TAIWAN SEMICONDUCTOR MANUFAC"): la clave más corta de la SEC que empieza igual
+  const nom = w.join(" ");
+  if (nom.length < 8) return null;
+  let mejor: [string, string] | null = null;
+  for (const [k, t] of m) if (k.startsWith(nom) && (!mejor || k.length < mejor[0].length)) mejor = [k, t];
+  return mejor?.[1] ?? null;
 }
 
 /* ── 13F (SEC EDGAR) ──────────────────────────────────────────────────────────── */
@@ -67,7 +85,7 @@ async function tabla13F(cik: number, acc: string): Promise<Fila13F[]> {
   for (const b of s.split(/<(?:\w+:)?infoTable>/).slice(1)) {
     const tag = (t: string) => b.match(new RegExp(`<(?:\\w+:)?${t}>([^<]*)<`))?.[1]?.trim() ?? "";
     if (tag("putCall")) continue; // opciones aparte: el radar mira acciones
-    const nombre = tag("nameOfIssuer");
+    const nombre = tag("nameOfIssuer").replace(/&amp;/g, "&");
     const f = out.get(nombre) ?? { nombre, valor: 0, acciones: 0 };
     f.valor += Number(tag("value")) || 0;
     f.acciones += Number(tag("sshPrnamt")) || 0;
@@ -76,7 +94,7 @@ async function tabla13F(cik: number, acc: string): Promise<Fila13F[]> {
   return [...out.values()];
 }
 
-export async function radar13F(persona: "thiel" | "berkshire", cik: number): Promise<PerfilRadar> {
+export async function radar13F(persona: Persona, cik: number): Promise<PerfilRadar> {
   const sub = (await (await get(`https://data.sec.gov/submissions/CIK${String(cik).padStart(10, "0")}.json`)).json()) as {
     filings: { recent: { form: string[]; accessionNumber: string[]; reportDate: string[] } };
   };
@@ -128,15 +146,24 @@ async function lineasPdf(url: string): Promise<string[]> {
   return out;
 }
 
-function agrupar(t: Array<{ ticker: string; nombre: string; fecha: string }>): Movimiento[] {
+type Trx = { ticker: string; nombre: string; fecha: string; compra: boolean; min: number; max: number };
+/** Rango de monto declarado: "$1,000,001 - $5,000,000" (o con el ruido del OCR: "$1 .000.001 • $5 000 000"). */
+export function rango(texto: string): { min: number; max: number } {
+  const n = [...texto.matchAll(/\$\s*([\d][\d.,\s]*\d|\d)/g)].map((x) => Number(x[1].replace(/\D/g, ""))).filter((v) => v >= 1000);
+  if (!n.length) return { min: 0, max: 0 };
+  return { min: n[0], max: n[1] && n[1] > n[0] ? n[1] : n[0] };
+}
+function agrupar(t: Trx[]): Movimiento[] {
   const m = new Map<string, Movimiento>();
   for (const x of t) {
-    const v = m.get(x.ticker) ?? { ticker: x.ticker, nombre: x.nombre, veces: 0, ultima: x.fecha };
+    const v = m.get(x.ticker) ?? { ticker: x.ticker, nombre: x.nombre, veces: 0, ultima: x.fecha, montoMin: 0, montoMax: 0 };
     v.veces++;
+    v.montoMin! += x.min;
+    v.montoMax! += x.max;
     if (x.fecha > v.ultima) v.ultima = x.fecha;
     m.set(x.ticker, v);
   }
-  return [...m.values()].sort((a, b) => b.veces - a.veces || b.ultima.localeCompare(a.ultima)).slice(0, 15);
+  return [...m.values()].sort((a, b) => b.montoMax! - a.montoMax! || b.veces - a.veces).slice(0, 15);
 }
 const iso = (mdY: string) => {
   const [mm, dd, yy] = mdY.split("/").map((x) => x.replace(/\D/g, ""));
@@ -145,12 +172,14 @@ const iso = (mdY: string) => {
 
 /* ── Pelosi: PTR de la Cámara ─────────────────────────────────────────────────── */
 export function parsePelosi(lineas: string[]) {
-  const out: Array<{ ticker: string; nombre: string; fecha: string; compra: boolean }> = [];
+  const out: Trx[] = [];
   lineas.forEach((l, i) => {
     const m = l.match(/^(?:SP|JT|DC|SELF)?\s*\|?\s*(.+?)\s*\|\s*(P|S|S \(partial\))\s*\|\s*(\d{2}\/\d{2}\/\d{4})/);
     if (!m) return;
-    const tk = `${l} ${lineas[i + 1] ?? ""}`.match(/\(([A-Z][A-Z.]{0,5})\)/)?.[1];
-    if (tk) out.push({ ticker: tk, nombre: m[1].replace(/\s*-\s*Common Stock.*/i, ""), fecha: iso(m[3]), compra: m[2] === "P" });
+    const par = `${l} ${lineas[i + 1] ?? ""}`.match(/\(([A-Z][A-Z.]{0,5})\)(\s*(?:\|\s*)?\[(\w+)\])?/);
+    // "(AB) [AB]" es el tipo de activo, no un ticker
+    const tk = par && par[1] !== par[3] ? par[1] : null;
+    if (tk) out.push({ ticker: tk, nombre: m[1].replace(/\s*-\s*Common Stock.*/i, ""), fecha: iso(m[3]), compra: m[2] === "P", ...rango(`${l} ${lineas[i + 1] ?? ""}`) });
   });
   return out;
 }
@@ -181,18 +210,20 @@ export const TRUMP_278T = [
   "https://extapps2.oge.gov/201/Presiden.nsf/PAS+Index/AC43530823BD60D485258E27002DDEF7/$FILE/Donald-J-Trump-06.25.2026-278T.pdf",
 ];
 export function parseTrump(lineas: string[], m: Map<string, string>, anio: number) {
-  const out: Array<{ ticker: string; nombre: string; fecha: string; compra: boolean }> = [];
+  const out: Trx[] = [];
   for (const l of lineas) {
     if (/\bDue\b|%/.test(l)) continue; // bonos municipales
     const c = l.split(" | ");
     const k = c.findIndex((x) => /urch|rcha|un:h|ourc|sale|sold/i.test(x));
     if (k < 1 || !/^\d{1,4}\b/.test(c[0])) continue;
     const nombre = c.slice(0, k).join(" ").replace(/^\d+\s*/, "").replace(/UNSOLICITED|SOLICITED/gi, "").trim();
+    // ETFs, fondos y bonos no son acciones: emparejarlos por nombre confunde al emisor con el fondo (SPDR → STT)
+    if (/\b(ETF|FUND|FD|TRUST|TR|SPDR|ISHARES|VANGUARD|INVESCO|TREASURY|BOND|BONO|MUNI|INDEX)\b/i.test(nombre)) continue;
     const tk = aTicker(m, nombre);
     if (!tk) continue;
     const f = c.slice(k).join(" ").match(/(\d{1,2})\s*[/l1I]\s*(\d{1,2})\s*[/l1I]\s*(\d{4})/);
     const fecha = f ? `${anio}-${f[1].padStart(2, "0")}-${f[2].padStart(2, "0")}` : `${anio}-01-01`;
-    out.push({ ticker: tk, nombre, fecha, compra: !/sale|sold/i.test(c[k]) });
+    out.push({ ticker: tk, nombre, fecha, compra: !/sale|sold/i.test(c[k]), ...rango(c.slice(k).join(" ")) });
   }
   return out;
 }
