@@ -29,32 +29,30 @@ function TablaMontos({ titulo, items, tono }: { titulo: string; items: Movimient
   return (
     <div className="min-w-0">
       <div className="flex items-baseline justify-between gap-2">
-        <p className="text-[0.7rem] font-bold uppercase tracking-wider" style={{ color: tono === "compra" ? "var(--sig-strong)" : "var(--terracotta-deep)" }}>{titulo}</p>
-        <p className="text-xs text-ink-soft num">Total ≈ {millones(total[0])} – {millones(total[1])}</p>
+        <p className="text-[0.65rem] font-bold uppercase tracking-wider" style={{ color: tono === "compra" ? "var(--sig-strong)" : "var(--terracotta-deep)" }}>{titulo}</p>
+        <p className="text-[0.68rem] text-ink-soft num">Total ≈ {millones(total[0])} – {millones(total[1])}</p>
       </div>
-      <div className="scroll-x mt-2">
-        <table className="table min-w-[420px] text-sm">
-          <thead>
-            <tr><th className="text-left">Acción</th><th className="num">Operaciones</th><th className="num">Monto estimado</th><th className="num">Última</th></tr>
-          </thead>
-          <tbody>
-            {items.slice(0, 10).map((m) => (
-              <tr key={m.ticker}>
-                <td>
-                  <Link href={`/accion/${m.ticker}`} className="flex items-center gap-2 hover:text-terracotta">
-                    <TickerLogo symbol={m.ticker} size={22} />
-                    <b>{m.ticker}</b>
-                    <span className="text-xs text-ink-soft truncate max-w-[9rem]">{m.nombre}</span>
-                  </Link>
-                </td>
-                <td className="num">{m.veces}</td>
-                <td className="num font-bold">{millones(m.montoMin)} – {millones(m.montoMax)}</td>
-                <td className="num text-xs text-ink-soft">{m.ultima}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      {/* Filas en rejilla compacta: sin tabla de ancho mínimo, nada se cruza en desktop ni en móvil */}
+      <div className="mt-2 grid grid-cols-[minmax(0,1fr)_2.2rem_7.5rem] sm:grid-cols-[minmax(0,1fr)_2.2rem_7.5rem_4.6rem] gap-x-2 text-[0.62rem] uppercase tracking-wider text-ink-soft border-b border-line pb-1">
+        <span>Acción</span>
+        <span className="text-right">Op.</span>
+        <span className="text-right">Monto estimado</span>
+        <span className="hidden sm:block text-right">Última</span>
       </div>
+      <ul className="divide-y divide-line">
+        {items.slice(0, 10).map((m) => (
+          <li key={m.ticker} className="grid grid-cols-[minmax(0,1fr)_2.2rem_7.5rem] sm:grid-cols-[minmax(0,1fr)_2.2rem_7.5rem_4.6rem] gap-x-2 items-center py-1.5 text-xs">
+            <Link href={`/accion/${m.ticker}`} className="flex items-center gap-1.5 min-w-0 hover:text-terracotta">
+              <TickerLogo symbol={m.ticker} size={18} />
+              <b className="shrink-0">{m.ticker}</b>
+              <span className="truncate text-[0.68rem] text-ink-soft">{m.nombre}</span>
+            </Link>
+            <span className="num text-right">{m.veces}</span>
+            <span className="num text-right font-bold whitespace-nowrap">{millones(m.montoMin)} – {millones(m.montoMax)}</span>
+            <span className="hidden sm:block num text-right text-[0.68rem] text-ink-soft">{m.ultima.slice(2)}</span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
@@ -62,15 +60,15 @@ function TablaMontos({ titulo, items, tono }: { titulo: string; items: Movimient
 function Politico({ p }: { p: PerfilRadar & { actualizado: string } }) {
   const q = QUIEN[p.persona];
   return (
-    <Card className="space-y-5">
+    <Card className="space-y-3 p-4 sm:p-5">
       <div>
         <Eyebrow>{q.rol}</Eyebrow>
-        <h2 className="font-display text-3xl leading-none mt-1">{q.nombre}</h2>
+        <h2 className="font-display text-2xl leading-none mt-0.5">{q.nombre}</h2>
         <p className="text-xs text-ink-soft mt-1">
           <a href={p.fuenteUrl} target="_blank" rel="noreferrer" className="underline">{q.fuente}</a> · {p.periodo} · actualizado {fecha(p.actualizado)}
         </p>
       </div>
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-4">
         <TablaMontos titulo="Más compradas" items={p.compras} tono="compra" />
         <TablaMontos titulo="Más vendidas" items={p.ventas} tono="venta" />
       </div>
@@ -86,7 +84,7 @@ function Lista({ titulo, items, tono }: { titulo: string; items: Movimiento[]; t
         {titulo}
       </p>
       {items.length ? (
-        <ul className="mt-2 space-y-1.5">
+        <ul className="mt-1.5 space-y-1">
           {items.slice(0, 6).map((m) => (
             <li key={m.ticker}>
               <Link href={`/accion/${m.ticker}`} className="flex items-center gap-2 text-sm hover:text-terracotta">
@@ -108,10 +106,10 @@ function Lista({ titulo, items, tono }: { titulo: string; items: Movimiento[]; t
 function Tarjeta({ p }: { p: PerfilRadar & { actualizado: string } }) {
   const q = QUIEN[p.persona];
   return (
-    <Card className="flex flex-col gap-4">
+    <Card className="flex flex-col gap-3 p-4 sm:p-5">
       <div>
         <Eyebrow>{q.rol}</Eyebrow>
-        <h2 className="font-display text-3xl leading-none mt-1">{q.nombre}</h2>
+        <h2 className="font-display text-2xl leading-none mt-0.5">{q.nombre}</h2>
         <p className="text-xs text-ink-soft mt-1">
           <a href={p.fuenteUrl} target="_blank" rel="noreferrer" className="underline">{q.fuente}</a> · {p.periodo}
         </p>
@@ -119,9 +117,9 @@ function Tarjeta({ p }: { p: PerfilRadar & { actualizado: string } }) {
       {p.posiciones.length > 0 && (
         <div>
           <p className="text-[0.68rem] font-bold uppercase tracking-wider text-ink-soft">Mayores posiciones · % del portafolio</p>
-          <ul className="mt-2 space-y-1.5">
+          <ul className="mt-1.5 space-y-1">
             {p.posiciones.slice(0, 6).map((x) => (
-              <li key={x.nombre} className="text-sm">
+              <li key={x.nombre} className="text-xs">
                 <div className="flex items-center gap-2">
                   {x.ticker ? <TickerLogo symbol={x.ticker} size={22} /> : <span className="w-[22px]" />}
                   {x.ticker ? <Link href={`/accion/${x.ticker}`} className="font-bold w-14 shrink-0 hover:text-terracotta">{x.ticker}</Link> : <span className="w-14 shrink-0 text-xs truncate">{x.nombre}</span>}
@@ -172,20 +170,20 @@ export default async function RadarPage() {
         <h2 className="font-display text-2xl sm:text-3xl mt-1">Cuando el poder coincide</h2>
         <p className="text-sm muted mt-1">Acciones que compraron dos o más de los {perfiles.length} en su último periodo reportado.</p>
         {coinciden.length ? (
-          <ul className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <ul className="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 text-sm">
             {coinciden.map(([t, v]) => (
               <li key={t}>
-                <Link href={`/accion/${t}`} className="flex items-center gap-3 rounded-2xl border border-[#3a3831] px-3 py-2.5 hover:border-terracotta">
-                  <TickerLogo symbol={t} size={36} />
+                <Link href={`/accion/${t}`} className="flex items-center gap-3 rounded-xl border border-[#3a3831] px-2.5 py-1.5 hover:border-terracotta">
+                  <TickerLogo symbol={t} size={28} />
                   <div className="min-w-0 flex-1">
                     <b>{t}</b> <span className="text-xs muted truncate">{v.nombre}</span>
                     <div className="flex flex-wrap gap-1 mt-1">
                       {v.personas.map((p) => (
-                        <span key={p} className="pill text-[0.65rem]" style={{ background: "var(--terracotta)", color: "var(--cream)" }}>{QUIEN[p].corto}</span>
+                        <span key={p} className="pill text-[0.6rem] !py-0" style={{ background: "var(--terracotta)", color: "var(--cream)" }}>{QUIEN[p].corto}</span>
                       ))}
                     </div>
                   </div>
-                  <span className="font-display text-2xl" style={{ color: "var(--terracotta)" }}>{v.personas.length}</span>
+                  <span className="font-display text-xl" style={{ color: "var(--terracotta)" }}>{v.personas.length}</span>
                 </Link>
               </li>
             ))}
