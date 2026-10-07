@@ -3,22 +3,11 @@ import Link from "next/link";
 import { leerRadar, type Movimiento, type PerfilRadar, type Persona } from "@/lib/providers/radar";
 import { Card, Eyebrow } from "@/components/ui";
 import { TickerLogo } from "@/components/TickerLogo";
+import { QUIEN } from "@/lib/radarPersonas";
 
 export const metadata: Metadata = { title: "Radar del Poder" };
 export const dynamic = "force-dynamic";
 
-const QUIEN: Record<Persona, { nombre: string; rol: string; fuente: string; corto: string }> = {
-  pelosi: { nombre: "Nancy Pelosi", rol: "Congresista de EE. UU. (California)", fuente: "Reportes PTR · Cámara de Representantes", corto: "Pelosi" },
-  trump: { nombre: "Donald Trump", rol: "Presidente de EE. UU.", fuente: "Formulario OGE 278-T · Oficina de Ética del Gobierno", corto: "Trump" },
-  thiel: { nombre: "Peter Thiel", rol: "Thiel Macro LLC", fuente: "Formulario 13F · SEC", corto: "Thiel" },
-  berkshire: { nombre: "Berkshire Hathaway", rol: "El portafolio de Warren Buffett", fuente: "Formulario 13F · SEC", corto: "Buffett" },
-  ackman: { nombre: "Bill Ackman", rol: "Pershing Square Capital", fuente: "Formulario 13F · SEC", corto: "Ackman" },
-  druckenmiller: { nombre: "Stanley Druckenmiller", rol: "Duquesne Family Office", fuente: "Formulario 13F · SEC", corto: "Druckenmiller" },
-  dalio: { nombre: "Ray Dalio", rol: "Bridgewater Associates", fuente: "Formulario 13F · SEC", corto: "Dalio" },
-  wood: { nombre: "Cathie Wood", rol: "ARK Invest", fuente: "Formulario 13F · SEC", corto: "Wood" },
-  tepper: { nombre: "David Tepper", rol: "Appaloosa", fuente: "Formulario 13F · SEC", corto: "Tepper" },
-  soros: { nombre: "George Soros", rol: "Soros Fund Management", fuente: "Formulario 13F · SEC", corto: "Soros" },
-};
 const ORDEN: Persona[] = ["pelosi", "trump", "berkshire", "thiel", "ackman", "druckenmiller", "tepper", "wood", "dalio", "soros"];
 const POLITICOS: Persona[] = ["pelosi", "trump"];
 /** Rangos declarados en el reporte: "$1.0M – $5.0M". Es una estimación, no el monto exacto. */

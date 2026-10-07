@@ -10,7 +10,7 @@ import { getDocumentProxy } from "unpdf";
  */
 export type Persona = string;
 /** montoMin/montoMax: suma de los rangos que exige el reporte (Pelosi y Trump declaran rangos, no montos exactos). */
-export interface Movimiento { ticker: string; nombre: string; veces: number; ultima: string; montoMin?: number; montoMax?: number }
+export interface Movimiento { ticker: string; nombre: string; veces: number; ultima: string; montoMin?: number; montoMax?: number; fechas?: string[] }
 
 /** Grandes fondos con 13F en EDGAR (CIK verificado en la búsqueda de la SEC). */
 export const FONDOS: Array<{ persona: Persona; cik: number }> = [
@@ -158,6 +158,7 @@ function agrupar(t: Trx[]): Movimiento[] {
   for (const x of t) {
     const v = m.get(x.ticker) ?? { ticker: x.ticker, nombre: x.nombre, veces: 0, ultima: x.fecha, montoMin: 0, montoMax: 0 };
     v.veces++;
+    v.fechas = [...new Set([...(v.fechas ?? []), x.fecha])].sort().slice(-20); // para estimar el precio de cada operación
     v.montoMin! += x.min;
     v.montoMax! += x.max;
     if (x.fecha > v.ultima) v.ultima = x.fecha;
