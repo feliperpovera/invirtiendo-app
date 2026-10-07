@@ -1,10 +1,19 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { PriceHistory, N } from "@/lib/analysis/types";
 import type { FvHistory } from "@/lib/analysis/fvhistory";
 import { fmtMoney, fmtPct, isNum, clamp } from "@/lib/format";
 import { ema, bollinger } from "@/lib/indicadores";
+import type { Movimiento } from "@/lib/providers/radar";
+
+type FilaPoder = { persona: string; trece: boolean; compra: Movimiento | null; venta: Movimiento | null };
+/** Pelosi y Trump van con su inicial y protagonismo; los fondos (13F) como franja del trimestre en que compraron. */
+const PODER: Record<string, { letra: string; nombre: string; color: string }> = {
+  pelosi: { letra: "P", nombre: "Pelosi", color: "#c46d34" },
+  trump: { letra: "T", nombre: "Trump", color: "#8c2f1b" },
+};
+const DIA = 864e5;
 
 const MES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
 type RangeKey = "1M" | "2M" | "3M" | "6M" | "1A" | "2A" | "5A" | "10A";
@@ -44,6 +53,15 @@ export function PriceFairValueChart({
   const [range, setRange] = useState<RangeKey>("2A");
   const [hover, setHover] = useState<number | null>(null);
   const [showBB, setShowBB] = useState(false);
+  const [showPoder, setShowPoder] = useState(true);
+  const [poder, setPoder] = useState<FilaPoder[]>([]);
+  useEffect(() => {
+    if (!history.symbol) return;
+    fetch(`/api/radar/${encodeURIComponent(history.symbol)}`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then(setPoder)
+      .catch(() => setPoder([]));
+  }, [history.symbol]);
   const [showEma, setShowEma] = useState(true);
   const W = 1000;
   const H = height;
@@ -184,6 +202,45 @@ export function PriceFairValueChart({
   const maxMarks = years <= 1 ? 6 : years <= 2 ? 8 : 6;
   const earn = thin((fv?.earnings ?? []).filter(inRange), maxMarks);
   const divs = thin((history.dividends ?? []).filter((d) => inRange(d.t)), maxMarks);
+
+  // Movimientos de poder: operaciones de Pelosi/Trump en su fecha (cierre de ese día) y la zona de precios en que compraron;
+  // los fondos con 13F, como franja del trimestre en que compraron (min–máx del precio en ese trimestre).
+  const serieDia = history.daily.length ? history.daily : price;
+  const cierreEn = (t: number) => {
+    let c: number | null = null;
+    for (const p of serieDia) if (p.t <= t + DIA) c = p.c;
+    return c;
+  };
+  const opsPoder: Array<{ t: number; c: number; quien: string; compra: boolean }> = [];
+  const zonasPoder: Array<{ quien: string; lo: number; hi: number; t: number }> = [];
+  const franjas: Array<{ quien: string; t0: number; t1: number; lo: number; hi: number }> = [];
+  if (showPoder)
+    for (const f of poder) {
+      const p = PODER[f.persona];
+      if (p) {
+        const compras: number[] = [];
+        for (const [m, compra] of [[f.compra, true], [f.venta, false]] as const)
+          for (const iso of m?.fechas ?? (m ? [m.ultima] : [])) {
+            const t = Date.parse(iso);
+            const c = cierreEn(t);
+            if (c == null) continue;
+            if (compra) compras.push(c);
+            if (inRange(t)) opsPoder.push({ t, c, quien: f.persona, compra });
+          }
+        if (compras.length) zonasPoder.push({ quien: f.persona, lo: Math.min(...compras), hi: Math.max(...compras), t: Date.parse(f.compra!.fechas?.[0] ?? f.compra!.ultima) });
+      } else if (f.trece && f.compra) {
+        const fin = Date.parse(f.compra.ultima) + DIA;
+        const ini = fin - 92 * DIA;
+        if (fin < t0) continue;
+        const v = serieDia.filter((x) => x.t > ini && x.t <= fin).map((x) => x.c);
+        if (!v.length) continue;
+        // Un solo trimestre para varios fondos: una franja con todos los nombres, no etiquetas encimadas
+        const ya = franjas.find((x) => Math.abs(x.t1 - Math.min(fin, asOf)) < 5 * DIA);
+        if (ya) ya.quien += ` · ${f.persona}`;
+        else franjas.push({ quien: f.persona, t0: Math.max(ini, t0), t1: Math.min(fin, asOf), lo: Math.min(...v), hi: Math.max(...v) });
+      }
+    }
+  const NOMBRE_FONDO: Record<string, string> = { wood: "ARK", berkshire: "Buffett", thiel: "Thiel", ackman: "Ackman", druckenmiller: "Druckenmiller", tepper: "Tepper", dalio: "Dalio", soros: "Soros" };
 
   const now = X(asOf);
   /** Punto final de una proyección, recortado al borde derecho del gráfico */
@@ -331,9 +388,18 @@ export function PriceFairValueChart({
               <path d={seriePath(ind.e200)} fill="none" stroke="var(--terracotta)" strokeWidth="2.5" vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
             </>
           )}
+          {franjas.map((f) => (
+            <rect key={`fr${f.quien}`} x={X(f.t0)} width={Math.max(2, X(f.t1) - X(f.t0))} y={Y(f.hi)} height={Math.max(2, Y(f.lo) - Y(f.hi))} fill="var(--olive)" opacity="0.14" />
+          ))}
+          {zonasPoder.map((z) => (
+            <rect key={`zp${z.quien}`} x={Math.max(PAD.l, X(z.t))} width={Math.max(0, now - Math.max(PAD.l, X(z.t)))} y={Y(z.hi) - 2} height={Math.max(4, Y(z.lo) - Y(z.hi) + 4)} fill={PODER[z.quien].color} opacity="0.13" />
+          ))}
           <path d={line(pricePts)} fill="none" stroke="var(--ink)" strokeWidth="2" vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
           <line x1={now} x2={now} y1={PAD.t} y2={H - PAD.b} stroke="var(--ink-soft)" strokeWidth="1.5" strokeDasharray="4 4" vectorEffect="non-scaling-stroke" />
           <circle cx={now} cy={Y(current)} r="4.5" fill="var(--ink)" />
+          {opsPoder.map((o, i) => (
+            <circle key={`op${i}`} cx={X(o.t)} cy={Y(o.c)} r="6" fill={o.compra ? PODER[o.quien].color : "var(--paper)"} stroke={PODER[o.quien].color} strokeWidth="2.5" vectorEffect="non-scaling-stroke" />
+          ))}
 
           {hoverPt && (
             <>
@@ -369,6 +435,35 @@ export function PriceFairValueChart({
               style={{ left: `${(X(t) / W) * 100}%`, top: "2px", borderColor: "var(--olive-deep)", color: "var(--olive-deep)" }}
             >
               R
+            </span>
+          ))}
+          {opsPoder.map((o, i) => (
+            <span
+              key={`lp${i}`}
+              title={`${PODER[o.quien].nombre} ${o.compra ? "compró" : "vendió"} · ${fmtDay(o.t)} · ≈ ${fmtMoney(o.c)}`}
+              className="absolute -translate-x-1/2 -translate-y-full inline-flex items-center justify-center px-1 h-4 rounded-[3px] text-[0.55rem] font-bold text-white pointer-events-auto"
+              style={{ left: `${(X(o.t) / W) * 100}%`, top: `calc(${(Y(o.c) / H) * 100}% - 8px)`, background: PODER[o.quien].color }}
+            >
+              {PODER[o.quien].letra}
+              {o.compra ? "▲" : "▼"}
+            </span>
+          ))}
+          {zonasPoder.map((z) => (
+            <span
+              key={`lz${z.quien}`}
+              className="absolute -translate-y-1/2 text-[0.58rem] font-bold px-1 rounded whitespace-nowrap"
+              style={{ left: `${(Math.max(PAD.l, X(z.t)) / W) * 100}%`, top: `${(Y(z.hi) / H) * 100}%`, color: PODER[z.quien].color, background: "var(--paper)" }}
+            >
+              Zona compra {PODER[z.quien].nombre} {fmtMoney(z.lo, 0)}–{fmtMoney(z.hi, 0)}
+            </span>
+          ))}
+          {franjas.map((f) => (
+            <span
+              key={`lf${f.quien}`}
+              className="absolute text-[0.55rem] font-bold px-1 rounded whitespace-nowrap text-olive-deep"
+              style={{ left: `${(X(f.t0) / W) * 100}%`, top: `calc(${(Y(f.lo) / H) * 100}% + 2px)`, background: "var(--paper)" }}
+            >
+              {f.quien.split(" · ").map((q) => NOMBRE_FONDO[q] ?? q).join(" · ")} {f.quien.includes(" · ") ? "compraron" : "compró"} {fmtMoney(f.lo, 0)}–{fmtMoney(f.hi, 0)}
             </span>
           ))}
           {divs.map((d) => (
@@ -418,6 +513,13 @@ export function PriceFairValueChart({
         <button type="button" aria-pressed={showEma} onClick={() => setShowEma(!showEma)} className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[0.7rem] font-bold ${showEma ? "border-ink" : "border-line text-ink-soft"}`}>
           <span className="w-4 h-0.5 rounded" style={{ background: "var(--terracotta)" }} />EMA 200
         </button>
+        {poder.length > 0 && (
+          <button type="button" aria-pressed={showPoder} onClick={() => setShowPoder(!showPoder)} className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[0.7rem] font-bold ${showPoder ? "border-ink" : "border-line text-ink-soft"}`}>
+            Movimientos de poder <span style={{ color: PODER.pelosi.color }}>P</span>
+            <span style={{ color: PODER.trump.color }}>T</span>
+            <span className="text-olive-deep">fondos</span>
+          </button>
+        )}
         {earn.length > 0 && <span className="text-ink-soft">R = resultados</span>}
         {divs.length > 0 && <span className="text-ink-soft">D = dividendo</span>}
       </div>
