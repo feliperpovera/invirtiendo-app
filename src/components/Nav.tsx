@@ -15,6 +15,7 @@ const COMPARAR = [
 const links = [
   { href: "/", label: "Home" },
   { href: "/ranking", label: "Ranking" },
+  { href: "/portafolio", label: "Portafolio" },
   { href: "/watchlist", label: "Watchlist" },
   { href: "/simulador", label: "Simulador" },
   { href: "/radar", label: "Radar del Poder" },
