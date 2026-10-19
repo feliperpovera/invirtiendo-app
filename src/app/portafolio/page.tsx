@@ -3,7 +3,7 @@ import Link from "next/link";
 import { leerPosiciones, leerMovimientos, leerResumen, type MovimientoPublico } from "@/lib/providers/portafolioPublico";
 import { leerRanking } from "@/lib/providers/ranking";
 import { PortafolioVsSP } from "@/components/PortafolioVsSP";
-import { PosicionesVivo, RendimientoCuenta } from "@/components/PortafolioVivo";
+import { PortafolioEnVivo, RendimientoCuenta } from "@/components/PortafolioVivo";
 import { PosicionesGraficas } from "@/components/PosicionesGraficas";
 import { TickerLogo } from "@/components/TickerLogo";
 import { Card, Eyebrow } from "@/components/ui";
@@ -25,21 +25,8 @@ const TIPO: Record<MovimientoPublico["tipo"], { txt: string; color: string }> = 
 export default async function PortafolioPage() {
   const [pos, mov, res, rk] = await Promise.all([leerPosiciones(), leerMovimientos(), leerResumen(), leerRanking(200)]);
   const senal = new Map(rk.map((r) => [r.ticker, r]));
-  const valor = pos.reduce((a, p) => a + (p.valor ?? 0), 0);
-  const pnl = pos.reduce((a, p) => a + (p.pnl ?? 0), 0);
-  const costo = valor - pnl;
-  const pnlDia = pos.reduce((a, p) => a + (p.pnl_dia ?? 0), 0);
-  const realizado = mov.reduce((a, m) => a + (m.pnl_realizado ?? 0), 0);
   const act = res?.actualizado ?? pos[0]?.actualizado;
-
-  const kpis: Array<[string, string, string?]> = [
-    ["Valor de la cuenta", fmtMoney(res?.nav ?? valor)],
-    ["Invertido en posiciones", fmtMoney(costo)],
-    ["Ganancia no realizada", `${signo(pnl)} · ${fmtPct(costo ? (pnl / costo) * 100 : null, 1, true)}`, color(pnl)],
-    ["Ganancia realizada", signo(realizado), color(realizado)],
-    ["Hoy", signo(pnlDia), color(pnlDia)],
-    ["Efectivo", fmtMoney(res?.efectivo ?? null)],
-  ];
+  const realizado = mov.reduce((a, m) => a + (m.pnl_realizado ?? 0), 0);
 
   return (
     <div className="pt-10 space-y-6">
@@ -47,19 +34,14 @@ export default async function PortafolioPage() {
         <Eyebrow>Portafolio Invirtiendoo</Eyebrow>
         <h1 className="font-display text-4xl sm:text-5xl leading-none">Nuestra cuenta real, a la vista.</h1>
         <p className="text-ink-soft mt-3 max-w-2xl text-sm">
-          Cada acción, cada compra y cada venta de nuestra cuenta en Interactive Brokers, con sus números. Los datos vienen directo de IBKR y se actualizan solos cada día hábil
-          {act ? ` · último corte ${new Date(act).toLocaleDateString("es-CO", { timeZone: "America/Bogota", day: "numeric", month: "short" })}` : ""}.
+          Cada acción, cada compra y cada venta de nuestra cuenta en Interactive Brokers. Valor y ganancias se calculan en vivo con precios de mercado sobre nuestras posiciones; las posiciones se revisan contra IBKR una vez al día
+          {act ? ` (última revisión ${new Date(act).toLocaleDateString("es-CO", { timeZone: "America/Bogota", day: "numeric", month: "short" })})` : ""}.
         </p>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
-        {kpis.map(([k, v, c]) => (
-          <Card key={k} className="p-3 sm:p-4">
-            <p className="text-[0.62rem] uppercase tracking-wider text-ink-soft font-bold">{k}</p>
-            <p className="num font-display text-xl sm:text-2xl mt-1 leading-tight" style={c ? { color: c } : undefined}>{v}</p>
-          </Card>
-        ))}
-      </div>
+
+
+      <PortafolioEnVivo pos={pos} efectivo={res?.efectivo ?? null} realizado={realizado} senales={Object.fromEntries(pos.map((p) => [p.ticker, senal.get(p.ticker)?.senal_key ? { key: senal.get(p.ticker)!.senal_key!, label: senal.get(p.ticker)!.senal ?? "" } : undefined]))} />
 
       <section className="space-y-2">
         <Eyebrow>Cómo se mueve la cuenta · frente al S&amp;P 500</Eyebrow>
@@ -68,7 +50,6 @@ export default async function PortafolioPage() {
 
       <PortafolioVsSP />
 
-      <PosicionesVivo pos={pos} senales={Object.fromEntries(pos.map((p) => [p.ticker, senal.get(p.ticker)?.senal_key ? { key: senal.get(p.ticker)!.senal_key!, label: senal.get(p.ticker)!.senal ?? "" } : undefined]))} />
 
       <PosicionesGraficas tickers={pos.map((p) => p.ticker)} movimientos={mov.map((m) => ({ fecha: m.fecha, ticker: m.ticker, tipo: m.tipo }))} />
 
