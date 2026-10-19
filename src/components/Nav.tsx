@@ -92,7 +92,7 @@ export function Nav() {
   }, []);
 
   const item = (activo: boolean) =>
-    `px-3 py-1.5 rounded-full transition-colors ${activo ? "bg-[#33312b] text-cream" : "text-[#d8cdb9] hover:text-cream hover:bg-[#33312b]"}`;
+    `px-2.5 py-1.5 rounded-full whitespace-nowrap transition-colors ${activo ? "bg-[#33312b] text-cream" : "text-[#d8cdb9] hover:text-cream hover:bg-[#33312b]"}`;
 
   return (
     <header className="sticky top-0 z-40 bg-ink text-cream border-b border-[#3a3831]">
@@ -102,11 +102,11 @@ export function Nav() {
         </Link>
 
         {/* Escritorio */}
-        <div className="flex-1 max-w-md hidden md:block">
+        <div className="flex-1 min-w-[11rem] max-w-md hidden md:block">
           <SearchBox compact />
         </div>
-        <nav className="ml-auto hidden md:flex items-center gap-1 text-sm">
-          {links.slice(0, 3).map((l) => (
+        <nav className="ml-auto hidden lg:flex items-center gap-0.5 text-sm">
+          {links.slice(1, 3).map((l) => (
             <Link key={l.href} href={l.href} aria-current={pathname === l.href ? "page" : undefined} className={item(pathname === l.href)}>
               {l.label}
             </Link>
@@ -120,6 +120,11 @@ export function Nav() {
               {l.label}
             </Link>
           ))}
+          {lead === null && (
+            <Link href="/watchlist" className="ml-1 whitespace-nowrap rounded-full bg-terracotta px-3.5 py-1.5 font-bold text-cream hover:brightness-110 transition">
+              Empieza gratis
+            </Link>
+          )}
           {lead && (
             <span className="ml-2 inline-flex items-center gap-2 pl-3 border-l border-[#3a3831] text-[#d8cdb9]">
               <span className="font-semibold text-cream truncate max-w-[10rem]" title={lead.email}>{lead.usuario}</span>
@@ -137,7 +142,7 @@ export function Nav() {
           aria-label={open ? "Cerrar menú" : "Abrir menú"}
           aria-expanded={open}
           aria-controls="menu-movil"
-          className="ml-auto md:hidden w-11 h-11 -mr-2 inline-flex items-center justify-center rounded-full hover:bg-[#33312b] active:bg-[#3a3831] transition-colors"
+          className="ml-auto lg:hidden w-11 h-11 -mr-2 inline-flex items-center justify-center rounded-full hover:bg-[#33312b] active:bg-[#3a3831] transition-colors"
         >
           <span className="relative block w-5 h-4" aria-hidden>
             {[0, 1, 2].map((i) => (
@@ -158,7 +163,7 @@ export function Nav() {
       {/* Panel móvil */}
       <div
         id="menu-movil"
-        className={`md:hidden overflow-hidden border-t border-[#3a3831] transition-[max-height,opacity] duration-300 ease-out ${open ? "max-h-[85vh] opacity-100" : "max-h-0 opacity-0"}`}
+        className={`lg:hidden overflow-hidden border-t border-[#3a3831] transition-[max-height,opacity] duration-300 ease-out ${open ? "max-h-[85vh] opacity-100" : "max-h-0 opacity-0"}`}
       >
         <div className="px-4 py-4 space-y-3">
           <SearchBox compact />

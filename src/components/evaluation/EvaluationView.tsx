@@ -21,6 +21,7 @@ import { PlanPanel } from "./PlanPanel";
 import { TickerLogo } from "@/components/TickerLogo";
 import { Consenso } from "./Consenso";
 import { RadarAccion } from "./RadarAccion";
+import { FranjaRendimiento } from "./FranjaRendimiento";
 
 const VERDICT_ES: Record<string, string> = { BUY: "Comprar por tramos", WATCHLIST: "Watchlist: esperar precio", REVIEW: "Faltan datos en algún pilar", DISCARD: "No cumple los pilares" };
 
@@ -79,6 +80,7 @@ export function EvaluationView({ ev }: { ev: Evaluation }) {
             </div>
           </div>
         </div>
+        <FranjaRendimiento symbol={ev.symbol} />
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4 max-w-2xl">
           <RangeBar label="Rango del día" low={q.low} high={q.high} price={q.price} />
           <RangeBar label="Rango 52 semanas" low={q.low52} high={q.high52} price={q.price} />
@@ -164,6 +166,14 @@ export function EvaluationView({ ev }: { ev: Evaluation }) {
       <PeersCard peers={ev.peers} symbol={ev.symbol} />
       <NewsCard s={ev.sentiment} wsb={ev.complementos?.wsb} />
       <PlanPanel ev={ev} adjusted={adjusted} signal={signal} buffettPassed={buffett.passed} />
+
+      {/* Llamado fijo en móvil (como el "Get started" de TradingView): lleva al plan y a la watchlist */}
+      <a href="#plan" className="md:hidden fixed bottom-3 inset-x-3 z-30 flex items-center justify-between gap-3 rounded-2xl bg-ink text-cream px-4 py-3 shadow-xl">
+        <span className="text-sm">
+          <b>{ev.symbol}</b> · {signal.label} · margen {fmtPct(adjusted.mos, 0, true)}
+        </span>
+        <span className="rounded-full bg-terracotta px-3 py-1.5 text-xs font-bold">Seguir gratis</span>
+      </a>
 
       <p className="text-xs text-ink-soft border-t border-line pt-3">
         Fuentes: {ev.sources.filter((s) => s.ok).map((s) => s.provider).filter((v, i, a) => a.indexOf(v) === i).join(" · ")}. Información educativa, no asesoría financiera.

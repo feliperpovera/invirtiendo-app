@@ -14,6 +14,7 @@ import type { PricePoint } from "./types";
 
 export const RANGOS = {
   "1D": { etiqueta: "Hoy", ttl: 60, meses: 0 },
+  "1S": { etiqueta: "1 semana", ttl: 900, meses: 0 },
   "1M": { etiqueta: "1 mes", ttl: 900, meses: 1 },
   "3M": { etiqueta: "3 meses", ttl: 900, meses: 3 },
   "6M": { etiqueta: "6 meses", ttl: 900, meses: 6 },
@@ -103,6 +104,7 @@ export const aDia = (t: number) => Math.floor(t / DIA) * DIA;
 export function inicioRango(rango: Rango, ultimo: number): number {
   const d = new Date(ultimo);
   if (rango === "YTD") return Date.UTC(d.getUTCFullYear() - 1, 11, 31);
+  if (rango === "1S") return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() - 7);
   return Date.UTC(d.getUTCFullYear(), d.getUTCMonth() - RANGOS[rango].meses, d.getUTCDate());
 }
 

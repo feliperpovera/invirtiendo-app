@@ -3,10 +3,10 @@ import Link from "next/link";
 import { leerPosiciones, leerMovimientos, leerResumen, type MovimientoPublico } from "@/lib/providers/portafolioPublico";
 import { leerRanking } from "@/lib/providers/ranking";
 import { PortafolioVsSP } from "@/components/PortafolioVsSP";
+import { PosicionesVivo, RendimientoCuenta } from "@/components/PortafolioVivo";
 import { TickerLogo } from "@/components/TickerLogo";
-import { Card, Eyebrow, SignalPill } from "@/components/ui";
+import { Card, Eyebrow } from "@/components/ui";
 import { fmtMoney, fmtPct } from "@/lib/format";
-import type { SignalKey } from "@/lib/analysis/types";
 
 export const metadata: Metadata = { title: "Portafolio Invirtiendoo" };
 export const dynamic = "force-dynamic";
@@ -20,7 +20,6 @@ const TIPO: Record<MovimientoPublico["tipo"], { txt: string; color: string }> = 
   compra: { txt: "Compra", color: "var(--olive-deep)" },
   venta: { txt: "Venta parcial", color: "var(--terracotta-deep)" },
 };
-const COLS = "grid-cols-[minmax(0,1fr)_5.5rem_5.5rem] lg:grid-cols-[minmax(0,1.1fr)_4.5rem_5.5rem_5.5rem_6rem_6.5rem_6.5rem]";
 
 export default async function PortafolioPage() {
   const [pos, mov, res, rk] = await Promise.all([leerPosiciones(), leerMovimientos(), leerResumen(), leerRanking(200)]);
@@ -61,48 +60,14 @@ export default async function PortafolioPage() {
         ))}
       </div>
 
+      <section className="space-y-2">
+        <Eyebrow>Cómo se mueve la cuenta · frente al S&amp;P 500</Eyebrow>
+        <RendimientoCuenta />
+      </section>
+
       <PortafolioVsSP />
 
-      <section>
-        <Eyebrow className="mb-2">Posiciones · {pos.length}</Eyebrow>
-        <Card className="p-0 overflow-hidden">
-          <div className={`grid ${COLS} gap-x-3 px-4 py-2 text-[0.6rem] uppercase tracking-wider text-ink-soft border-b border-line`}>
-            <span>Acción</span>
-            <span className="hidden lg:block text-right">Cantidad</span>
-            <span className="hidden lg:block text-right">Compra prom.</span>
-            <span className="text-right">Precio hoy</span>
-            <span className="hidden lg:block text-right">Valor</span>
-            <span className="text-right">Ganancia</span>
-            <span className="hidden lg:block text-right">Señal hoy</span>
-          </div>
-          <ul className="divide-y divide-line">
-            {pos.map((p) => {
-              const s = senal.get(p.ticker);
-              return (
-                <li key={p.ticker} className={`grid ${COLS} gap-x-3 items-center px-4 py-2 text-sm`}>
-                  <Link href={`/accion/${p.ticker}`} className="flex items-center gap-2 min-w-0 hover:text-terracotta">
-                    <TickerLogo symbol={p.ticker} size={26} />
-                    <span className="min-w-0">
-                      <b>{p.ticker}</b> <span className="num text-xs text-ink-soft">{p.peso.toFixed(1)}%</span>
-                      <span className="block text-[0.65rem] text-ink-soft lg:hidden num">{cant(p.cantidad)} × {fmtMoney(p.precio_prom)} prom.</span>
-                      {p.desde && <span className="hidden lg:block text-[0.65rem] text-ink-soft">desde {fecha(p.desde)}</span>}
-                    </span>
-                  </Link>
-                  <span className="hidden lg:block num text-right">{cant(p.cantidad)}</span>
-                  <span className="hidden lg:block num text-right">{fmtMoney(p.precio_prom)}</span>
-                  <span className="num text-right">{fmtMoney(p.precio)}</span>
-                  <span className="hidden lg:block num text-right font-bold">{fmtMoney(p.valor)}</span>
-                  <span className="num text-right font-bold leading-tight" style={{ color: color(p.pnl) }}>
-                    {signo(p.pnl)}
-                    <span className="block text-[0.7rem]">{fmtPct(p.rent, 1, true)}</span>
-                  </span>
-                  <span className="hidden lg:flex justify-end">{s?.senal_key ? <SignalPill k={s.senal_key as SignalKey} label={s.senal ?? ""} /> : <span className="text-xs text-ink-soft">ETF</span>}</span>
-                </li>
-              );
-            })}
-          </ul>
-        </Card>
-      </section>
+      <PosicionesVivo pos={pos} senales={Object.fromEntries(pos.map((p) => [p.ticker, senal.get(p.ticker)?.senal_key ? { key: senal.get(p.ticker)!.senal_key!, label: senal.get(p.ticker)!.senal ?? "" } : undefined]))} />
 
       <section>
         <Eyebrow className="mb-2">Movimientos · compras y ventas</Eyebrow>

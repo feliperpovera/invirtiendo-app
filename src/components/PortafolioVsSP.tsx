@@ -23,7 +23,7 @@ interface Datos {
   pesos: Array<{ ticker: string; peso: number }>;
 }
 
-const ORDEN: Rango[] = ["1D", "1M", "3M", "6M", "YTD", "1A", "3A", "5A"];
+const ORDEN: Rango[] = ["1D", "1S", "1M", "3M", "6M", "YTD", "1A", "3A", "5A"];
 const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
 
 /** Fecha según el rango: hora de Nueva York en intradía; día y mes; mes y año si el periodo pasa del año. */
@@ -264,7 +264,7 @@ export function PortafolioVsSP() {
             </p>
           )}
         </div>
-        <div role="group" aria-label="Periodo" className="grid w-full grid-cols-8 gap-1 sm:flex sm:w-auto sm:gap-1.5">
+        <div role="group" aria-label="Periodo" className="grid w-full grid-cols-9 gap-1 sm:flex sm:w-auto sm:gap-1.5">
           {ORDEN.map((r) => (
             <button
               key={r}
