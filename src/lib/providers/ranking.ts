@@ -21,6 +21,8 @@ export interface RankingRow {
   grade: string | null;
   senal: string | null;
   senal_key: string | null;
+  fwd_pe: number | null;
+  proximo_earnings: string | null;
   actualizado: string;
 }
 
@@ -45,6 +47,8 @@ export async function guardarRanking(ev: Evaluation): Promise<void> {
         p_senal: ev.score.signal.label,
         p_senal_key: ev.score.signal.key,
         p_market_cap: n(ev.metrics.marketCap),
+        p_fwd_pe: n(ev.valuation.multiples.forwardPe),
+        p_proximo_earnings: ev.earningsCalendar?.nextDate ?? null,
       }),
     });
   } catch {

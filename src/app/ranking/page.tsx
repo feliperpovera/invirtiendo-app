@@ -10,7 +10,7 @@ const fecha = (iso: string) =>
   new Date(iso).toLocaleString("es-CO", { timeZone: "America/Bogota", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
 
 export default async function RankingPage() {
-  const filas = await leerRanking(100);
+  const filas = await leerRanking(300);
   const ultima = filas.reduce((m, r) => (r.actualizado > m ? r.actualizado : m), "");
 
   return (

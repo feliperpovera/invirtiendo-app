@@ -246,3 +246,8 @@ body {
 .table td { padding: 0.7rem 0.75rem; border-bottom: 1px solid var(--line-soft); vertical-align: middle; }
 .table tr:last-child td { border-bottom: none; }
 .table td.num, .table th.num { text-align: right; }
+
+/* Cinta de precios: dos copias seguidas que se desplazan media longitud, bucle sin salto */
+@keyframes cinta { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+.cinta { animation: cinta 70s linear infinite; width: max-content; }
+@media (prefers-reduced-motion: reduce) { .cinta { animation: none; } }

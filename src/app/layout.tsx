@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Fraunces, Figtree } from "next/font/google";
 import "./globals.css";
 import { Nav } from "@/components/Nav";
+import { TickerTape } from "@/components/TickerTape";
 import { Analytics } from "@vercel/analytics/next";
 
 const fraunces = Fraunces({
@@ -33,6 +34,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="es" className={`${fraunces.variable} ${figtree.variable} h-full`}>
       <body className="min-h-full flex flex-col">
         <Nav />
+        <TickerTape />
         <main className="flex-1 w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pb-16">{children}</main>
         <footer className="border-t border-line mt-8">
           <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between text-sm text-ink-soft">

@@ -12,6 +12,57 @@ const COMPARAR = [
   { href: "/comparar-etf", label: "ETFs" },
 ];
 
+const MERCADOS = [
+  { href: "/mercados", label: "Resumen" },
+  { href: "/mapa", label: "Mapa de calor" },
+  { href: "/calendario", label: "Calendario" },
+  { href: "/noticias", label: "Noticias" },
+];
+
+/** Submenú desplegable del escritorio (Comparar, Mercados): se cierra al navegar o con clic fuera. */
+function Menu({ titulo, items, pathname, item }: { titulo: string; items: Array<{ href: string; label: string }>; pathname: string; item: (a: boolean) => string }) {
+  const [abierto, setAbierto] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => setAbierto(false), [pathname]);
+  useEffect(() => {
+    if (!abierto) return;
+    const fuera = (e: MouseEvent) => ref.current && !ref.current.contains(e.target as Node) && setAbierto(false);
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && setAbierto(false);
+    document.addEventListener("mousedown", fuera);
+    window.addEventListener("keydown", esc);
+    return () => {
+      document.removeEventListener("mousedown", fuera);
+      window.removeEventListener("keydown", esc);
+    };
+  }, [abierto]);
+  const activo = items.some((c) => pathname === c.href);
+  return (
+    <div className="relative" ref={ref}>
+      <button type="button" onClick={() => setAbierto((c) => !c)} aria-expanded={abierto} aria-haspopup="true" className={`${item(activo || abierto)} inline-flex items-center gap-1.5`}>
+        {titulo}
+        <span aria-hidden className="transition-transform duration-200" style={{ transform: abierto ? "rotate(180deg)" : "none" }}>
+          ▾
+        </span>
+      </button>
+      {abierto && (
+        <div className="absolute right-0 mt-2 w-48 rounded-2xl bg-ink-2 border border-[#3a3831] shadow-lg p-1.5 rise">
+          {items.map((c) => (
+            <Link
+              key={c.href}
+              href={c.href}
+              onClick={() => setAbierto(false)}
+              aria-current={pathname === c.href ? "page" : undefined}
+              className={`block px-3 py-2 rounded-xl transition-colors ${pathname === c.href ? "bg-terracotta text-cream" : "text-[#d8cdb9] hover:text-cream hover:bg-[#3a3831]"}`}
+            >
+              {c.label}
+            </Link>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 const links = [
   { href: "/", label: "Home" },
   { href: "/ranking", label: "Ranking" },
@@ -19,22 +70,15 @@ const links = [
   { href: "/watchlist", label: "Watchlist" },
   { href: "/simulador", label: "Simulador" },
   { href: "/radar", label: "Radar del Poder" },
-  { href: "/noticias", label: "Noticias" },
 ];
 
 export function Nav() {
   const [open, setOpen] = useState(false);
-  const [comparar, setComparar] = useState(false);
   const pathname = usePathname();
-  const cmpRef = useRef<HTMLDivElement>(null);
   const { lead, salir } = useLead();
-  const enComparar = COMPARAR.some((c) => pathname === c.href);
 
   // Cerrar al navegar · bloquear el scroll del fondo · cerrar con Escape
-  useEffect(() => {
-    setOpen(false);
-    setComparar(false);
-  }, [pathname]);
+  useEffect(() => setOpen(false), [pathname]);
   useEffect(() => {
     document.body.style.overflow = open ? "hidden" : "";
     return () => {
@@ -42,23 +86,10 @@ export function Nav() {
     };
   }, [open]);
   useEffect(() => {
-    const esc = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
-      setOpen(false);
-      setComparar(false);
-    };
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
     window.addEventListener("keydown", esc);
     return () => window.removeEventListener("keydown", esc);
   }, []);
-  // Cerrar el submenú al hacer clic fuera
-  useEffect(() => {
-    if (!comparar) return;
-    const fuera = (e: MouseEvent) => {
-      if (cmpRef.current && !cmpRef.current.contains(e.target as Node)) setComparar(false);
-    };
-    document.addEventListener("mousedown", fuera);
-    return () => document.removeEventListener("mousedown", fuera);
-  }, [comparar]);
 
   const item = (activo: boolean) =>
     `px-3 py-1.5 rounded-full transition-colors ${activo ? "bg-[#33312b] text-cream" : "text-[#d8cdb9] hover:text-cream hover:bg-[#33312b]"}`;
@@ -81,36 +112,8 @@ export function Nav() {
             </Link>
           ))}
 
-          {/* Comparativo: acciones y ETFs en un solo lugar */}
-          <div className="relative" ref={cmpRef}>
-            <button
-              type="button"
-              onClick={() => setComparar((c) => !c)}
-              aria-expanded={comparar}
-              aria-haspopup="true"
-              className={`${item(enComparar || comparar)} inline-flex items-center gap-1.5`}
-            >
-              Comparar
-              <span aria-hidden className="transition-transform duration-200" style={{ transform: comparar ? "rotate(180deg)" : "none" }}>
-                ▾
-              </span>
-            </button>
-            {comparar && (
-              <div className="absolute right-0 mt-2 w-44 rounded-2xl bg-ink-2 border border-[#3a3831] shadow-lg p-1.5 rise">
-                {COMPARAR.map((c) => (
-                  <Link
-                    key={c.href}
-                    href={c.href}
-                    onClick={() => setComparar(false)}
-                    aria-current={pathname === c.href ? "page" : undefined}
-                    className={`block px-3 py-2 rounded-xl transition-colors ${pathname === c.href ? "bg-terracotta text-cream" : "text-[#d8cdb9] hover:text-cream hover:bg-[#3a3831]"}`}
-                  >
-                    {c.label}
-                  </Link>
-                ))}
-              </div>
-            )}
-          </div>
+          <Menu titulo="Mercados" items={MERCADOS} pathname={pathname} item={item} />
+          <Menu titulo="Comparar" items={COMPARAR} pathname={pathname} item={item} />
 
           {links.slice(3).map((l) => (
             <Link key={l.href} href={l.href} aria-current={pathname === l.href ? "page" : undefined} className={item(pathname === l.href)}>
@@ -182,25 +185,32 @@ export function Nav() {
               </button>
             </div>
           )}
-          {/* En móvil no hay hover: el submenú se abre plano, con su título */}
-          <div>
-            <p className="text-[0.68rem] uppercase tracking-[0.12em] font-bold px-1 mb-2" style={{ color: "#8d867a" }}>
-              Comparar
-            </p>
-            <nav className="grid grid-cols-2 gap-2">
-              {COMPARAR.map((c) => (
-                <Link
-                  key={c.href}
-                  href={c.href}
-                  onClick={() => setOpen(false)}
-                  aria-current={pathname === c.href ? "page" : undefined}
-                  className={`px-4 py-3 rounded-xl text-[0.95rem] font-semibold transition-colors ${pathname === c.href ? "bg-terracotta text-cream" : "bg-[#2f2d27] text-[#d8cdb9] active:bg-[#3a3831]"}`}
-                >
-                  {c.label}
-                </Link>
-              ))}
-            </nav>
-          </div>
+          {/* En móvil no hay hover: los submenús se abren planos, con su título */}
+          {(
+            [
+              ["Mercados", MERCADOS],
+              ["Comparar", COMPARAR],
+            ] as const
+          ).map(([t, grupo]) => (
+            <div key={t}>
+              <p className="text-[0.68rem] uppercase tracking-[0.12em] font-bold px-1 mb-2" style={{ color: "#8d867a" }}>
+                {t}
+              </p>
+              <nav className="grid grid-cols-2 gap-2">
+                {grupo.map((c) => (
+                  <Link
+                    key={c.href}
+                    href={c.href}
+                    onClick={() => setOpen(false)}
+                    aria-current={pathname === c.href ? "page" : undefined}
+                    className={`px-4 py-3 rounded-xl text-[0.95rem] font-semibold transition-colors ${pathname === c.href ? "bg-terracotta text-cream" : "bg-[#2f2d27] text-[#d8cdb9] active:bg-[#3a3831]"}`}
+                  >
+                    {c.label}
+                  </Link>
+                ))}
+              </nav>
+            </div>
+          ))}
         </div>
       </div>
     </header>
