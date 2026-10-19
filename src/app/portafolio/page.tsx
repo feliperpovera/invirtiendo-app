@@ -4,6 +4,7 @@ import { leerPosiciones, leerMovimientos, leerResumen, type MovimientoPublico } 
 import { leerRanking } from "@/lib/providers/ranking";
 import { PortafolioVsSP } from "@/components/PortafolioVsSP";
 import { PosicionesVivo, RendimientoCuenta } from "@/components/PortafolioVivo";
+import { PosicionesGraficas } from "@/components/PosicionesGraficas";
 import { TickerLogo } from "@/components/TickerLogo";
 import { Card, Eyebrow } from "@/components/ui";
 import { fmtMoney, fmtPct } from "@/lib/format";
@@ -68,6 +69,8 @@ export default async function PortafolioPage() {
       <PortafolioVsSP />
 
       <PosicionesVivo pos={pos} senales={Object.fromEntries(pos.map((p) => [p.ticker, senal.get(p.ticker)?.senal_key ? { key: senal.get(p.ticker)!.senal_key!, label: senal.get(p.ticker)!.senal ?? "" } : undefined]))} />
+
+      <PosicionesGraficas tickers={pos.map((p) => p.ticker)} movimientos={mov.map((m) => ({ fecha: m.fecha, ticker: m.ticker, tipo: m.tipo }))} />
 
       <section>
         <Eyebrow className="mb-2">Movimientos · compras y ventas</Eyebrow>

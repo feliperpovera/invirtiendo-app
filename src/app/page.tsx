@@ -2,6 +2,7 @@ import Link from "next/link";
 import { SearchBox } from "@/components/SearchBox";
 import { MarketPulseCard } from "@/components/MarketPulse";
 import { PortafolioVsSP } from "@/components/PortafolioVsSP";
+import { IndicesMundo } from "@/components/IndicesMundo";
 import { WatchlistTable } from "@/components/WatchlistTable";
 import { Eyebrow } from "@/components/ui";
 import { BullMark } from "@/components/Logo";
@@ -17,7 +18,9 @@ const ETFS = ["QQQM", "VOO", "SPLG", "SMH", "SCHD", "VTI"];
 
 export default function Home() {
   return (
-    <div className="space-y-8 pt-10">
+    <div className="space-y-8 pt-6">
+      <IndicesMundo />
+
       <section className="relative z-30 text-center max-w-2xl mx-auto">
         <BullMark size={44} className="mx-auto mb-3" />
         <h1 className="font-display text-4xl sm:text-5xl leading-[0.95]">

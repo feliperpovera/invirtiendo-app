@@ -9,6 +9,16 @@ export const INSTRUMENTOS = [
   { s: "^DJI", n: "Dow Jones", g: "Índices" },
   { s: "^RUT", n: "Russell 2000", g: "Índices" },
   { s: "^VIX", n: "VIX", g: "Índices" },
+  { s: "^STOXX50E", n: "Euro Stoxx 50", g: "Mundo", pais: "🇪🇺" },
+  { s: "^GDAXI", n: "DAX (Alemania)", g: "Mundo", pais: "🇩🇪" },
+  { s: "^FTSE", n: "FTSE 100 (Reino Unido)", g: "Mundo", pais: "🇬🇧" },
+  { s: "^FCHI", n: "CAC 40 (Francia)", g: "Mundo", pais: "🇫🇷" },
+  { s: "^N225", n: "Nikkei 225 (Japón)", g: "Mundo", pais: "🇯🇵" },
+  { s: "^HSI", n: "Hang Seng (Hong Kong)", g: "Mundo", pais: "🇭🇰" },
+  { s: "000001.SS", n: "Shanghái", g: "Mundo", pais: "🇨🇳" },
+  { s: "^NSEI", n: "Nifty 50 (India)", g: "Mundo", pais: "🇮🇳" },
+  { s: "^BVSP", n: "Bovespa (Brasil)", g: "Mundo", pais: "🇧🇷" },
+  { s: "^MXX", n: "IPC (México)", g: "Mundo", pais: "🇲🇽" },
   { s: "^TNX", n: "Tesoro 10 años", g: "Tasas y dólar", pct: true },
   { s: "^TYX", n: "Tesoro 30 años", g: "Tasas y dólar", pct: true },
   { s: "DX-Y.NYB", n: "Índice dólar (DXY)", g: "Tasas y dólar" },
@@ -22,12 +32,12 @@ export const INSTRUMENTOS = [
   { s: "ETH-USD", n: "Ethereum", g: "Cripto" },
 ] as const;
 
-export interface Instrumento { symbol: string; nombre: string; grupo: string; tasa: boolean; precio: number; cambio: number | null; ytd: number | null; a1: number | null; serie: PricePoint[] }
+export interface Instrumento { symbol: string; nombre: string; grupo: string; pais?: string; tasa: boolean; precio: number; cambio: number | null; ytd: number | null; a1: number | null; serie: PricePoint[] }
 
 const pct = (a?: number, b?: number) => (a && b ? (a / b - 1) * 100 : null);
 
 export function mercados(): Promise<Instrumento[]> {
-  return cached("mercados:v1", 5 * 60 * 1000, async () => {
+  return cached("mercados:v2", 5 * 60 * 1000, async () => {
     const out = await Promise.all(
       INSTRUMENTOS.map(async (i): Promise<Instrumento | null> => {
         try {
@@ -35,7 +45,7 @@ export function mercados(): Promise<Instrumento[]> {
           const c = r.closes1y;
           const anio = new Date().getUTCFullYear();
           const base = [...c].reverse().find((p) => new Date(p.t).getUTCFullYear() < anio)?.c;
-          return { symbol: i.s, nombre: i.n, grupo: i.g, tasa: "pct" in i, precio: r.price, cambio: r.changePct, ytd: pct(r.price, base), a1: pct(r.price, c[0]?.c), serie: c.filter((_, k) => k % 3 === 0 || k === c.length - 1) };
+          return { symbol: i.s, nombre: i.n, grupo: i.g, pais: "pais" in i ? i.pais : undefined, tasa: "pct" in i, precio: r.price, cambio: r.changePct, ytd: pct(r.price, base), a1: pct(r.price, c[0]?.c), serie: c.filter((_, k) => k % 3 === 0 || k === c.length - 1) };
         } catch {
           return null;
         }
