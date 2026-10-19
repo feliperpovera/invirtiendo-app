@@ -71,8 +71,14 @@ export function median(v: number[]): N {
 export const DISPERSION_MAX = 60;
 
 export function fuentesDeAcuerdo(componentes: Array<{ valor: number }>, fairValue: N): boolean {
-  const vals = componentes.map((c) => c.valor).filter((x) => isNum(x) && x > 0);
+  let vals = componentes.map((c) => c.valor).filter((x) => isNum(x) && x > 0);
   if (vals.length < 2 || !isNum(fairValue) || fairValue <= 0) return true;
+  // Con 3+ fuentes la mediana ya ignora UN extremo; medir la dispersión con él castigaba casos como
+  // AVGO (modelo $427 y analistas $476 de acuerdo, un DCF en $125): se descarta la fuente más lejana.
+  if (vals.length >= 3) {
+    const lejos = vals.reduce((a, b) => (Math.abs(b - fairValue) > Math.abs(a - fairValue) ? b : a));
+    vals = vals.filter((_, i) => i !== vals.indexOf(lejos));
+  }
   return ((Math.max(...vals) - Math.min(...vals)) / fairValue) * 100 <= DISPERSION_MAX;
 }
 

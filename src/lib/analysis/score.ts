@@ -13,6 +13,8 @@ export function signalFor(mos: number | null, failedCore: boolean, fiable = true
   if (!isNum(mos)) return { key: "watch", label: "Sin Fair Value", text: "No hay utilidad estimada positiva para el próximo año: sin eso este método no valora. Watch." };
   if (!fiable && mos >= 15)
     return { key: "watch", label: "Watch", text: `Las fuentes del Fair Value se contradicen en más de ${DISPERSION_MAX}%: el descuento no es fiable como para comprar. Watch hasta que coincidan.` };
+  // Un descuento de 80%+ casi siempre es un dato roto (EPS atípico, acción de centavos), no una ganga.
+  if (mos >= 80) return { key: "watch", label: "Watch", text: "Descuento extremo frente al Fair Value (80%+): casi siempre es un dato atípico. Revisar a mano antes de comprar." };
   if (mos >= 25) return { key: "strong", label: "Strong Buy", text: "Margin of Safety ≥ 25%: comprar por tramos con decisión." };
   if (mos >= 15) return { key: "good", label: "Buy Zone", text: "Margin of Safety ≥ 15%: en zona de compra. Entrar por tramos." };
   if (mos >= -10) return { key: "watch", label: "Watch", text: "Precio cerca del Fair Value (±10%): watchlist con precio objetivo." };

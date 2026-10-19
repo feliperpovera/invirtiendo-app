@@ -63,6 +63,8 @@ assert.equal(fuentesDeAcuerdo([{ valor: 100 }, { valor: 130 }], 115), true, "30%
 assert.equal(fuentesDeAcuerdo([{ valor: 185 }, { valor: 3443 }], 1361), false, `${DISPERSION_MAX}%: el caso Micron no pasa`);
 assert.equal(fuentesDeAcuerdo([{ valor: 100 }], 100), true, "una sola fuente no se contradice consigo misma");
 assert.equal(fuentesDeAcuerdo([], null), true, "sin fuentes no se bloquea nada");
+assert.equal(fuentesDeAcuerdo([{ valor: 426.73 }, { valor: 124.79 }, { valor: 475.6 }], 426.73), true, "AVGO: un solo DCF atípico no bloquea si modelo y analistas coinciden");
+assert.equal(fuentesDeAcuerdo([{ valor: 100 }, { valor: 400 }, { valor: 900 }], 400), false, "tres fuentes todas lejos siguen bloqueando");
 const { signalFor } = await import("../src/lib/analysis/score.ts");
 assert.equal(signalFor(40, false, true).label, "Strong Buy");
 assert.equal(signalFor(40, false, false).label, "Watch", "con fuentes en desacuerdo, un +40% no es Strong Buy");
