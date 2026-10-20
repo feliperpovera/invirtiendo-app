@@ -54,6 +54,8 @@ export function mercados(): Promise<Instrumento[]> {
         }
       }),
     );
-    return out.filter((x): x is Instrumento => !!x);
+    const ok = out.filter((x): x is Instrumento => !!x);
+    if (!ok.length) throw new Error("Yahoo no devolvió ningún instrumento"); // no guardar una lista vacía en caché
+    return ok;
   });
 }

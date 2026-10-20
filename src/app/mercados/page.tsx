@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { connection } from "next/server";
 import { mercados } from "@/lib/providers/mercados";
 import { Card, Eyebrow } from "@/components/ui";
 import { Sparkline } from "@/components/charts";
@@ -6,13 +7,13 @@ import { fmtPct } from "@/lib/format";
 import { ValoracionSP } from "@/components/ValoracionSP";
 
 export const metadata: Metadata = { title: "Mercados" };
-export const revalidate = 300;
 
 const precio = (v: number, tasa: boolean) => (tasa ? `${v.toFixed(2)}%` : v.toLocaleString("en-US", { maximumFractionDigits: v >= 1000 ? 0 : 2 }));
 const tono = (v: number | null) => ((v ?? 0) >= 0 ? "var(--sig-strong)" : "var(--sig-avoid)");
 
 export default async function MercadosPage() {
-  const m = await mercados();
+  await connection(); // se arma en cada visita (Yahoo + caché de 5 min); prerenderizada quedaba vacía si Yahoo fallaba en el build
+  const m = await mercados().catch(() => []);
   const grupos = [...new Set(m.map((x) => x.grupo))];
   return (
     <div className="pt-10 space-y-6">
@@ -22,6 +23,7 @@ export default async function MercadosPage() {
         <p className="text-ink-soft mt-3 text-sm">Índices, tasas, dólar, materias primas y cripto. Precios con hasta 15 min de retraso (Yahoo Finance).</p>
       </div>
       <ValoracionSP />
+      {m.length === 0 && <p className="text-ink-soft text-sm">No pudimos cargar los precios en este momento. Recarga la página en unos segundos.</p>}
       {grupos.map((g) => (
         <section key={g}>
           <Eyebrow className="mb-2">{g}</Eyebrow>
