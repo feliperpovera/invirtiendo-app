@@ -3,6 +3,7 @@ import { SearchBox } from "@/components/SearchBox";
 import { MarketPulseCard } from "@/components/MarketPulse";
 import { PortafolioVsSP } from "@/components/PortafolioVsSP";
 import { IndicesMundo } from "@/components/IndicesMundo";
+import { ValoracionSP } from "@/components/ValoracionSP";
 import { WatchlistTable } from "@/components/WatchlistTable";
 import { Eyebrow } from "@/components/ui";
 import { BullMark } from "@/components/Logo";
@@ -32,6 +33,8 @@ export default function Home() {
       </section>
 
       <PortafolioVsSP />
+
+      <ValoracionSP />
 
       <section className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {UNIVERSE.map((u) => (
