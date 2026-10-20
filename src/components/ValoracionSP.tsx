@@ -17,13 +17,16 @@ const BANDAS = [
 const COLOR_ZONA: Record<string, string> = { "miedo-extremo": "var(--sig-strong)", miedo: "var(--olive-deep)", neutral: "var(--ink-soft)", codicia: "var(--terracotta-deep)", "codicia-extrema": "var(--sig-avoid)" };
 
 /** Indicador de valoración del S&P 500 con zonas de compra (estilo RankingStock, modelo Invirtiendo). */
-export function ValoracionSP() {
+export function ValoracionSP({ symbol = "^GSPC", nombre = "S&P 500", embebido = false }: { symbol?: string; nombre?: string; embebido?: boolean }) {
   const [d, setD] = useState<Datos | null>(null);
   const [w, setW] = useState(0);
   const [hover, setHover] = useState<number | null>(null);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    fetch("/api/valoracion-sp500").then((r) => r.json()).then((j) => !j.error && setD(j)).catch(() => {});
+    setD(null);
+    fetch(`/api/valoracion-sp500?symbol=${encodeURIComponent(symbol)}`).then((r) => r.json()).then((j) => !j.error && setD(j)).catch(() => {});
+  }, [symbol]);
+  useEffect(() => {
     const el = ref.current;
     if (!el) return;
     const ro = new ResizeObserver(([e]) => setW(Math.round(e.contentRect.width)));
@@ -41,12 +44,13 @@ export function ValoracionSP() {
   const h = hover != null ? s[hover] : null;
   const act = d?.actual;
 
+  const Caja = embebido ? "div" : Card;
   return (
-    <Card className="p-4 sm:p-5">
+    <Caja className={embebido ? "" : "p-4 sm:p-5"}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <Eyebrow>Valoración del S&amp;P 500 · ¿momento de compra?</Eyebrow>
-          <p className="text-xs text-ink-soft mt-1 max-w-xl">0 = el mercado más barato de los últimos 2 años, 100 = el más caro. Combina distancia a la media de 200 días, RSI, VIX y caída desde el máximo.</p>
+          <Eyebrow>Valoración del {nombre} · ¿momento de compra?</Eyebrow>
+          <p className="text-xs text-ink-soft mt-1 max-w-xl">0 = el mercado más barato de los últimos 2 años, 100 = el más caro. Combina distancia a la media de 200 días, RSI, volatilidad implícita y caída desde el máximo.</p>
         </div>
         {act && (
           <div className="text-right">
@@ -63,7 +67,7 @@ export function ValoracionSP() {
       }} style={{ touchAction: "pan-y" }}>
         {w > 0 && s.length > 1 ? (
           <>
-            <svg width={w} height={H} role="img" aria-label={`Indicador de valoración del S&P 500: ${act ? Math.round(act.nivel) : ""}, ${act?.zona.label ?? ""}`}>
+            <svg width={w} height={H} role="img" aria-label={`Indicador de valoración del ${nombre}: ${act ? Math.round(act.nivel) : ""}, ${act?.zona.label ?? ""}`}>
               {BANDAS.map((b) => (
                 <rect key={b.de} x={L} width={w - L - R} y={y(b.a)} height={y(b.de) - y(b.a)} fill={b.color} opacity={b.op} />
               ))}
@@ -81,7 +85,7 @@ export function ValoracionSP() {
               <circle cx={x(s.length - 1)} cy={y(s[s.length - 1].nivel)} r="5" fill="var(--terracotta)" stroke="var(--paper)" strokeWidth="2" />
               {hover != null && <line x1={x(hover)} x2={x(hover)} y1={T} y2={H - B} stroke="var(--ink)" opacity="0.3" />}
             </svg>
-            <p className="text-[0.62rem] uppercase tracking-wider text-ink-soft font-bold mt-2">S&amp;P 500 en el mismo periodo</p>
+            <p className="text-[0.62rem] uppercase tracking-wider text-ink-soft font-bold mt-2">{nombre} en el mismo periodo</p>
             <svg width={w} height={H2} aria-hidden>
               <path d={s.map((p, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y2(p.sp).toFixed(1)}`).join("")} fill="none" stroke="var(--terracotta)" strokeWidth="1.6" />
               {s.map((p, i) => (p.nivel < 30 ? <circle key={i} cx={x(i)} cy={y2(p.sp)} r="2.4" fill="var(--sig-strong)" /> : null))}
@@ -90,7 +94,7 @@ export function ValoracionSP() {
             {h && (
               <div className="pointer-events-none absolute top-1 rounded-xl border border-line bg-paper px-3 py-2 text-xs shadow-md" style={{ left: Math.min(Math.max(x(hover!) - 80, 0), w - 170), width: 170 }}>
                 <p className="text-ink-soft">{new Date(h.t).toLocaleDateString("es-CO", { day: "numeric", month: "short", year: "numeric" })}</p>
-                <p>Nivel <b className="num">{Math.round(h.nivel)}</b> · S&amp;P <b className="num">{Math.round(h.sp).toLocaleString("en-US")}</b></p>
+                <p>Nivel <b className="num">{Math.round(h.nivel)}</b> · {nombre} <b className="num">{Math.round(h.sp).toLocaleString("en-US")}</b></p>
                 <p className="text-ink-soft num">200d {Math.round(h.comps[0])} · RSI {Math.round(h.comps[1])} · VIX {Math.round(h.comps[2])} · Máx {Math.round(h.comps[3])}</p>
               </div>
             )}
@@ -106,9 +110,9 @@ export function ValoracionSP() {
             {b.label} {b.de}–{b.a}
           </span>
         ))}
-        <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full" style={{ background: "var(--sig-strong)" }} /> días en miedo extremo sobre el S&amp;P</span>
+        <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full" style={{ background: "var(--sig-strong)" }} /> días en miedo extremo</span>
       </div>
-      <p className="text-[0.68rem] text-ink-soft mt-2">Historia 2021-2026: con el indicador bajo 30 el S&amp;P subió en promedio +15% en los 6 meses siguientes; entre 30 y 45, +12%; en neutral o codicia, ~7%. Educativo, no es recomendación.</p>
-    </Card>
+      <p className="text-[0.68rem] text-ink-soft mt-2">Calibrado en el S&amp;P 500 (2021-2026): bajo 30 subió en promedio +15% en los 6 meses siguientes; entre 30 y 45, +12%; en neutral o codicia, ~7%. Educativo, no es recomendación.</p>
+    </Caja>
   );
 }

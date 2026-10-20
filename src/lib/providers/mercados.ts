@@ -32,6 +32,9 @@ export const INSTRUMENTOS = [
   { s: "ETH-USD", n: "Ethereum", g: "Cripto" },
 ] as const;
 
+/** Índices contra los que se puede comparar el portafolio y medir la valoración (EE. UU. y mundo). */
+export const INDICES_COMPARABLES: Record<string, string> = Object.fromEntries(INSTRUMENTOS.filter((i) => (i.g === "Índices" && i.s !== "^VIX") || i.g === "Mundo").map((i) => [i.s, i.n.replace(/ \(.+\)/, "")]));
+
 export interface Instrumento { symbol: string; nombre: string; grupo: string; pais?: string; tasa: boolean; precio: number; cambio: number | null; ytd: number | null; a1: number | null; serie: PricePoint[] }
 
 const pct = (a?: number, b?: number) => (a && b ? (a / b - 1) * 100 : null);

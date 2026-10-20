@@ -5,6 +5,7 @@ import { Card, Eyebrow } from "./ui";
 import { fmtPct, isNum } from "@/lib/format";
 import { RANGOS, type Rango } from "@/lib/analysis/portafolio";
 import { ema, bollinger } from "@/lib/indicadores";
+import { ValoracionSP } from "./ValoracionSP";
 
 interface Datos {
   rango: Rango;
@@ -54,7 +55,7 @@ function useAncho() {
   return { ref, w };
 }
 
-function Grafico({ d, showBB, showEma, ema200 }: { d: Datos; showBB: boolean; showEma: boolean; ema200: Array<{ t: number; e: number; i: number }> | null }) {
+function Grafico({ d, showBB, showEma, ema200, nombre }: { d: Datos; showBB: boolean; showEma: boolean; ema200: Array<{ t: number; e: number; i: number }> | null; nombre: string }) {
   const { ref, w } = useAncho();
   const [hover, setHover] = useState<number | null>(null);
   const H = w < 480 ? 220 : 280;
@@ -128,7 +129,7 @@ function Grafico({ d, showBB, showEma, ema200 }: { d: Datos; showBB: boolean; sh
           width={w}
           height={H}
           role="img"
-          aria-label={`Portafolio Invirtiendoo ${fmtPct(d.retorno.portafolio, 1, true)} y S&P 500 ${fmtPct(d.retorno.indice, 1, true)} en ${RANGOS[d.rango].etiqueta}`}
+          aria-label={`Portafolio Invirtiendoo ${fmtPct(d.retorno.portafolio, 1, true)} y ${nombre} ${fmtPct(d.retorno.indice, 1, true)} en ${RANGOS[d.rango].etiqueta}`}
           onPointerMove={(e) => mover(e.clientX)}
           onPointerDown={(e) => mover(e.clientX)}
           onPointerLeave={() => setHover(null)}
@@ -188,7 +189,7 @@ function Grafico({ d, showBB, showEma, ema200 }: { d: Datos; showBB: boolean; sh
             <span className="num font-bold">{h.portafolio === null ? "aún no existía" : fmtPct(h.portafolio - 100, 1, true)}</span>
           </p>
           <p className="flex justify-between gap-2">
-            <span>S&amp;P 500</span>
+            <span>{nombre}</span>
             <span className="num">{fmtPct(h.indice - 100, 1, true)}</span>
           </p>
         </div>
@@ -198,8 +199,19 @@ function Grafico({ d, showBB, showEma, ema200 }: { d: Datos; showBB: boolean; sh
 }
 
 /** Portada: el Portafolio Invirtiendoo contra el S&P 500, en vivo y en varios periodos. */
+/** Evento que emiten las tarjetas de índices de la portada: cambia el índice del gráfico sin salir de la página. */
+export const EVENTO_INDICE = "invirtiendo:indice";
+export type IndiceElegido = { symbol: string; nombre: string };
+
 export function PortafolioVsSP() {
   const [rango, setRango] = useState<Rango>("YTD");
+  const [idx, setIdx] = useState<IndiceElegido>({ symbol: "^GSPC", nombre: "S&P 500" });
+  useEffect(() => {
+    const cambiar = (e: Event) => setIdx((e as CustomEvent<IndiceElegido>).detail);
+    window.addEventListener(EVENTO_INDICE, cambiar);
+    return () => window.removeEventListener(EVENTO_INDICE, cambiar);
+  }, []);
+  const q = `&indice=${encodeURIComponent(idx.symbol)}`;
   const [datos, setDatos] = useState<Datos | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [cargando, setCargando] = useState(true);
@@ -207,7 +219,8 @@ export function PortafolioVsSP() {
   const [showEma, setShowEma] = useState(true);
   const [ema200, setEma200] = useState<Array<{ t: number; e: number; i: number }> | null>(null);
   useEffect(() => {
-    fetch("/api/portafolio?rango=5A")
+    setEma200(null);
+    fetch(`/api/portafolio?rango=5A${q}`)
       .then((r) => r.json())
       .then((j: Datos) => {
         const v = j.puntos.map((p) => p.indice);
@@ -215,12 +228,12 @@ export function PortafolioVsSP() {
         setEma200(j.puntos.map((p, k) => ({ t: p.t, e: e[k], i: v[k] })));
       })
       .catch(() => {});
-  }, []);
+  }, [q]);
 
   useEffect(() => {
     let vivo = true;
     const cargar = () =>
-      fetch(`/api/portafolio?rango=${rango}`)
+      fetch(`/api/portafolio?rango=${rango}${q}`)
         .then((r) => r.json())
         .then((j) => {
           if (!vivo) return;
@@ -240,7 +253,7 @@ export function PortafolioVsSP() {
       vivo = false;
       clearInterval(iv);
     };
-  }, [rango]);
+  }, [rango, q]);
 
   // Al cambiar de periodo se deja el anterior atenuado hasta que llegan los datos nuevos.
   const d = datos;
@@ -250,10 +263,10 @@ export function PortafolioVsSP() {
   const desde = d?.inicioPortafolio ? fecha(d.inicioPortafolio, "1M", true).replace(/^\d+ /, "") : null;
 
   return (
-    <Card className="p-5 sm:p-6">
+    <Card className="p-5 sm:p-6 scroll-mt-24" id="grafica-inicio">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <Eyebrow>Portafolio Invirtiendoo vs S&amp;P 500</Eyebrow>
+          <Eyebrow>Portafolio Invirtiendoo vs {idx.nombre}</Eyebrow>
           {d?.enVivo && (
             <p className="mt-1 inline-flex items-center gap-2 text-xs text-ink-soft">
               <span className="relative flex h-2 w-2">
@@ -285,7 +298,7 @@ export function PortafolioVsSP() {
           <p className="num font-display text-4xl leading-none text-terracotta">{d ? fmtPct(d.retorno.portafolio, 1, true) : "—"}</p>
         </div>
         <div>
-          <p className="text-xs font-bold uppercase tracking-wider text-ink-soft">S&amp;P 500{d?.inicioPortafolio ? ` · ${RANGOS[d.rango].etiqueta}` : ""}</p>
+          <p className="text-xs font-bold uppercase tracking-wider text-ink-soft">{idx.nombre}{d?.inicioPortafolio ? ` · ${RANGOS[d.rango].etiqueta}` : ""}</p>
           <p className="num font-display text-4xl leading-none">{d ? fmtPct(d.retorno.indice, 1, true) : "—"}</p>
         </div>
         {isNum(dif) && (
@@ -293,14 +306,14 @@ export function PortafolioVsSP() {
             <b className="num" style={{ color: dif >= 0 ? "var(--sig-strong)" : "var(--sig-avoid)" }}>
               {Math.abs(dif).toFixed(1)} pp
             </b>{" "}
-            {dif >= 0 ? "por encima" : "por debajo"} del índice · {desde ? `en el mismo tramo, desde ${desde} (S&P ${fmtPct(d!.retorno.indiceComun, 1, true)})` : RANGOS[d!.rango].etiqueta.toLowerCase()}
+            {dif >= 0 ? "por encima" : "por debajo"} del índice · {desde ? `en el mismo tramo, desde ${desde} (${idx.nombre} ${fmtPct(d!.retorno.indiceComun, 1, true)})` : RANGOS[d!.rango].etiqueta.toLowerCase()}
           </p>
         )}
       </div>
 
       {d ? (
         <div className={`transition-opacity ${atenuado ? "opacity-60" : ""}`} aria-busy={atenuado}>
-          <Grafico d={d} showBB={showBB} showEma={showEma} ema200={ema200} />
+          <Grafico d={d} showBB={showBB} showEma={showEma} ema200={ema200} nombre={idx.nombre} />
         </div>
       ) : error ? (
         <div className="mt-4 flex h-[220px] items-center justify-center rounded-xl bg-cream-2/60 text-sm text-ink-soft sm:h-[280px]">No pude leer el mercado: {error}</div>
@@ -311,7 +324,7 @@ export function PortafolioVsSP() {
       {d && (
         <>
           <div className="mt-3 flex flex-wrap items-center gap-2 text-[0.7rem] font-bold">
-            <span className="font-normal text-ink-soft">Sobre el S&amp;P 500:</span>
+            <span className="font-normal text-ink-soft">Sobre el {idx.nombre}:</span>
             <button type="button" aria-pressed={showEma} onClick={() => setShowEma(!showEma)} className={`rounded-full border px-2 py-0.5 ${showEma ? "border-ink" : "border-line text-ink-soft"}`}>
               <span className="mr-1 inline-block h-0.5 w-3 align-middle" style={{ background: "var(--olive)" }} />EMA 200
             </button>
@@ -322,6 +335,10 @@ export function PortafolioVsSP() {
                 {p.ticker} <span className="num font-medium text-ink-soft">{p.peso.toFixed(p.peso < 10 ? 1 : 0)}%</span>
               </span>
             ))}
+          </div>
+          {/* Valoración del mismo índice: dónde están las zonas de compra */}
+          <div className="mt-5 border-t border-line pt-4">
+            <ValoracionSP symbol={idx.symbol} nombre={idx.nombre} embebido />
           </div>
           <p className="mt-3 text-xs leading-relaxed text-ink-soft">
             Cuenta real de Invirtiendoo en Interactive Brokers, empezó en diciembre de 2025: en 1, 3 y 5 años el S&amp;P se ve completo y el portafolio arranca ese día, pegado a su línea. Rendimiento ponderado por tiempo (TWR): los aportes nuevos no cuentan como ganancia. Incluye dividendos; el S&amp;P 500 es el índice de precio, sin dividendos. &quot;Hoy&quot; es un estimado en vivo con los pesos del último cierre; los demás periodos son el dato oficial de IBKR. Rendimientos pasados no aseguran resultados futuros.

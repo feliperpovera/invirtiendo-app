@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { yahooSerie } from "@/lib/providers/yahoo";
+import { INDICES_COMPARABLES } from "@/lib/providers/mercados";
 import { cached } from "@/lib/providers/cache";
 import { nivelesIbkr, pesosIbkr } from "@/lib/providers/portafolioIbkr";
 import {
@@ -40,10 +41,10 @@ async function intradia(tickers: string[]): Promise<Array<Serie | null>> {
 }
 
 /** El punto "ahora", compartido por todos los periodos y recalculado cada minuto. */
-function vivo(): Promise<Vivo | null> {
-  return cached("portafolio:vivo", MINUTO, async () => {
+function vivo(indice: string): Promise<Vivo | null> {
+  return cached(`portafolio:vivo:${indice}`, MINUTO, async () => {
     const pesos = await pesosIbkr();
-    const [sp, ...pos] = await intradia(["^GSPC", ...pesos.map((p) => p.ticker)]);
+    const [sp, ...pos] = await intradia([indice, ...pesos.map((p) => p.ticker)]);
     if (!sp?.base) return null;
     let valor = 0;
     let peso = 0;
@@ -63,14 +64,17 @@ function vivo(): Promise<Vivo | null> {
 export async function GET(req: NextRequest) {
   const pedido = (req.nextUrl.searchParams.get("rango") ?? "YTD").toUpperCase();
   const rango: Rango = pedido in RANGOS ? (pedido as Rango) : "YTD";
+  // Índice de comparación: S&P 500 por defecto; también Nasdaq-100, Dow Jones y Russell 2000
+  const pedidoIdx = req.nextUrl.searchParams.get("indice") ?? "^GSPC";
+  const indice = pedidoIdx in INDICES_COMPARABLES ? pedidoIdx : "^GSPC";
   try {
     const pesos = await pesosIbkr();
 
     if (rango === "1D") {
-      const data = await cached("portafolio:ibkr:1D", MINUTO, async () => {
-        const [indice, ...resto] = await intradia(["^GSPC", ...pesos.map((p) => p.ticker)]);
-        if (!indice) throw new Error("Sin datos del S&P 500");
-        const comp = compararConIndice(indice, pesos.map((p, i) => ({ ticker: p.ticker, peso: p.peso, serie: resto[i] })));
+      const data = await cached(`portafolio:ibkr:1D:${indice}`, MINUTO, async () => {
+        const [serieIdx, ...resto] = await intradia([indice, ...pesos.map((p) => p.ticker)]);
+        if (!serieIdx) throw new Error("Sin datos del índice");
+        const comp = compararConIndice(serieIdx, pesos.map((p, i) => ({ ticker: p.ticker, peso: p.peso, serie: resto[i] })));
         if (!comp) throw new Error("Sin datos de hoy");
         return comp;
       });
@@ -80,8 +84,8 @@ export async function GET(req: NextRequest) {
     // La historia (IBKR + S&P diario) cambia una vez al día: 15 minutos de caché.
     const [ibkr, sp, v] = await Promise.all([
       nivelesIbkr(),
-      yahooSerie("^GSPC", "5y", "1d", 15 * MINUTO),
-      vivo().catch(() => null),
+      yahooSerie(indice, "5y", "1d", 15 * MINUTO),
+      vivo(indice).catch(() => null),
     ]);
     if (ibkr.length < 2) throw new Error("Todavía no hay historia de IBKR");
     const ultimoIbkr = ibkr[ibkr.length - 1].t;
