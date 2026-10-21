@@ -105,7 +105,7 @@ export function SearchBox({ compact = false, autoFocus = false, onSelect, placeh
         {loading && <span className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full border-2 border-terracotta border-t-transparent animate-spin" aria-hidden />}
       </div>
       {open && hits.length > 0 && (
-        <ul id="search-results" role="listbox" className="absolute z-[60] mt-2 w-full card overflow-hidden text-ink" style={{ boxShadow: "0 18px 40px -16px rgba(34,33,29,.45)" }}>
+        <ul id="search-results" role="listbox" className={`absolute z-[60] mt-2 card overflow-hidden text-ink ${compact ? "left-0 w-[min(28rem,calc(100vw-2rem))]" : "w-full"}`} style={{ boxShadow: "0 18px 40px -16px rgba(34,33,29,.45)" }}>
           {hits.map((h, i) => (
             <li key={h.symbol} role="option" aria-selected={i === idx}>
               <button

@@ -120,12 +120,12 @@ export function Ranking({ filas }: { filas: RankingRow[] }) {
 
       <Card className="p-0 overflow-hidden">
         <div className="scroll-x">
-          <table className="table min-w-[900px]">
+          <table className="table table-compacta w-full text-sm min-w-[640px] lg:min-w-0">
             <thead>
               <tr>
                 <th>#</th>
                 <th>Acción</th>
-                <th>Sector</th>
+                <th className="hidden 2xl:table-cell">Sector</th>
                 {th("score", "Score")}
                 <th>Señal</th>
                 {th("precio", "Precio")}
@@ -138,17 +138,18 @@ export function Ranking({ filas }: { filas: RankingRow[] }) {
             <tbody>
               {vista.map((r, i) => (
                 <tr key={r.ticker}>
-                  <td className="num font-display text-xl text-ink-soft w-10">{i + 1}</td>
+                  <td className="num font-display text-lg text-ink-soft w-8">{i + 1}</td>
                   <td>
                     <Link href={`/accion/${r.ticker}`} className="font-bold hover:text-terracotta inline-flex items-center gap-1.5">
                       <TickerLogo symbol={r.ticker} size={20} />
                       {r.ticker}
                     </Link>
-                    <div className="text-xs text-ink-soft truncate max-w-[14rem]">{r.nombre ?? ""}</div>
+                    <div className="text-xs text-ink-soft truncate max-w-[11rem]">{r.nombre ?? ""}</div>
+                    <div className="text-[0.65rem] text-ink-soft 2xl:hidden truncate max-w-[11rem]">{r.sector ?? ""}</div>
                   </td>
-                  <td className="text-xs text-ink-soft whitespace-nowrap">{r.sector ?? "—"}</td>
+                  <td className="hidden 2xl:table-cell text-xs text-ink-soft whitespace-nowrap">{r.sector ?? "—"}</td>
                   <td className="num">
-                    <span className="font-display text-2xl leading-none">{r.score}</span>
+                    <span className="font-display text-xl leading-none">{r.score}</span>
                     <span className="text-xs text-ink-soft ml-1">{r.grade}</span>
                   </td>
                   <td>{r.senal_key && r.senal ? <SignalPill k={r.senal_key as SignalKey} label={r.senal} /> : "—"}</td>

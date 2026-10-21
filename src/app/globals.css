@@ -251,3 +251,6 @@ body {
 @keyframes cinta { from { transform: translateX(0); } to { transform: translateX(-50%); } }
 .cinta { animation: cinta 70s linear infinite; width: max-content; }
 @media (prefers-reduced-motion: reduce) { .cinta { animation: none; } }
+
+/* Tablas anchas (ranking): menos relleno para que quepan sin scroll horizontal en escritorio */
+.table-compacta th, .table-compacta td { padding: 0.5rem 0.45rem; }
