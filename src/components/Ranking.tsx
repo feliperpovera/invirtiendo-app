@@ -12,7 +12,12 @@ const colorMos = (mos: number | null) => (isNum(mos) ? (mos >= 15 ? "var(--sig-s
 
 const SENALES: Array<[string, string]> = [["strong", "Strong Buy"], ["good", "Buy Zone"], ["watch", "Watch"], ["wait", "Wait"], ["avoid", "Avoid"]];
 const CAPS: Array<[string, number]> = [["Todas", 0], [">$10B", 1e10], [">$100B", 1e11], [">$1T", 1e12]];
-type Orden = "score" | "mos" | "fwd_pe" | "market_cap" | "precio";
+type Orden = "score" | "mos" | "fwd_pe" | "market_cap" | "precio" | "grade" | "senal";
+const PESO_NOTA: Record<string, number> = { A: 5, B: 4, C: 3, D: 2, F: 1 };
+const PESO_SENAL: Record<string, number> = { strong: 5, good: 4, watch: 3, wait: 2, avoid: 1 };
+const RANKEAR: Array<[Orden, string]> = [["score", "Score Invirtiendo"], ["mos", "Margen de seguridad"], ["grade", "Calificación"], ["senal", "Señal"]];
+/** Valor numérico para ordenar: nota y señal se pasan a escala; empata por score. */
+const valorOrden = (f: RankingRow, k: Orden) => (k === "grade" ? (PESO_NOTA[f.grade ?? ""] ?? 0) * 1000 + f.score : k === "senal" ? (PESO_SENAL[f.senal_key ?? ""] ?? 0) * 1000 + (f.mos ?? -999) / 1000 + f.score : (f[k] as number | null));
 
 /**
  * Ranking + screener (al estilo TradingView) sobre NUESTROS cálculos: señal, margen de seguridad, score y nota.
@@ -39,7 +44,7 @@ export function Ranking({ filas }: { filas: RankingRow[] }) {
       .filter((f) => !capMin || (isNum(f.market_cap) && f.market_cap >= capMin))
       .filter((f) => !nota || (f.grade ?? "") <= nota)
       .sort((a, b) => {
-        const x = a[orden.k] ?? -Infinity, y = b[orden.k] ?? -Infinity;
+        const x = valorOrden(a, orden.k) ?? -Infinity, y = valorOrden(b, orden.k) ?? -Infinity;
         return (orden.desc ? -1 : 1) * ((x as number) - (y as number));
       });
   }, [filas, q, sector, senales, mosMin, peMax, capMin, nota, orden]);
@@ -54,10 +59,35 @@ export function Ranking({ filas }: { filas: RankingRow[] }) {
   );
   const limpiar = () => { setQ(""); setSector(""); setSenales([]); setMosMin(-100); setPeMax(0); setCapMin(0); setNota(""); };
 
+  const conteo = (k: string) => filas.filter((f) => f.senal_key === k).length;
+  const segmento = senales.length === 1 ? senales[0] : "";
+  const nombreOrden = RANKEAR.find(([k]) => k === orden.k)?.[1] ?? "";
+
   return (
     <div className="space-y-5">
+      {/* Segmentar y rankear: lo primero que se elige */}
+      <div className="card p-3 sm:p-4 space-y-3">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-[0.65rem] uppercase tracking-wider font-bold text-ink-soft w-24 shrink-0">Segmento</span>
+          {[["", "Todas", filas.length] as const, ...SENALES.map(([k, l]) => [k, l, conteo(k)] as const)].map(([k, l, n]) => (
+            <button key={k || "todas"} type="button" aria-pressed={segmento === k && (k !== "" || !senales.length)} onClick={() => setSenales(k ? [k] : [])} className={`pill border text-xs ${(k ? segmento === k : !senales.length) ? "bg-ink text-cream border-ink" : "border-line text-ink-soft hover:border-ink"}`}>
+              {l} <span className="num opacity-70">{n}</span>
+            </button>
+          ))}
+        </div>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-[0.65rem] uppercase tracking-wider font-bold text-ink-soft w-24 shrink-0">Rankear por</span>
+          {RANKEAR.map(([k, l]) => (
+            <button key={k} type="button" aria-pressed={orden.k === k} onClick={() => setOrden({ k, desc: true })} className={`pill border text-xs ${orden.k === k ? "bg-terracotta text-cream border-terracotta" : "border-line text-ink-soft hover:border-terracotta"}`}>
+              {l}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <p className="eyebrow">Top 5 · {segmento ? SENALES.find(([k]) => k === segmento)?.[1] : "todas"} · por {nombreOrden.toLowerCase()}</p>
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        {filas.slice(0, 5).map((r, i) => (
+        {vista.slice(0, 5).map((r, i) => (
           <Link key={r.ticker} href={`/accion/${r.ticker}`} className="card p-4 hover:border-terracotta transition-colors">
             <div className="flex items-start justify-between gap-2">
               <span className="font-display text-3xl leading-none text-terracotta">{i + 1}</span>
@@ -97,13 +127,6 @@ export function Ranking({ filas }: { filas: RankingRow[] }) {
             <option value="C">Nota C o mejor</option>
           </select>
           {filtrado && <button type="button" onClick={limpiar} className="text-xs underline text-ink-soft ml-auto">Limpiar filtros</button>}
-        </div>
-        <div className="flex flex-wrap items-center gap-1.5">
-          {SENALES.map(([k, l]) => (
-            <button key={k} type="button" aria-pressed={senales.includes(k)} onClick={() => setSenales((s) => (s.includes(k) ? s.filter((x) => x !== k) : [...s, k]))} className={`pill border text-xs ${senales.includes(k) ? "bg-ink text-cream border-ink" : "border-line text-ink-soft"}`}>
-              {l}
-            </button>
-          ))}
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-xs">
           <label className="flex items-center gap-2">
