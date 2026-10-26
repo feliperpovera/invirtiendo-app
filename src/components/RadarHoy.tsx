@@ -8,6 +8,12 @@ import { ValoracionSP } from "./ValoracionSP";
 import { EVENTO_INDICE, type IndiceElegido } from "./PortafolioVsSP";
 import { fmtMoney, fmtPct } from "@/lib/format";
 
+const OPCIONES: IndiceElegido[] = [
+  { symbol: "^GSPC", nombre: "S&P 500" },
+  { symbol: "^NDX", nombre: "Nasdaq-100" },
+  { symbol: "^DJI", nombre: "Dow Jones" },
+  { symbol: "^RUT", nombre: "Russell 2000" },
+];
 type Lectura = { nivel: number; zona: { key: string; label: string; accion: string } };
 const COLOR: Record<string, string> = { "miedo-extremo": "var(--sig-strong)", miedo: "var(--olive-deep)", neutral: "var(--ink-soft)", codicia: "var(--terracotta-deep)", "codicia-extrema": "var(--sig-avoid)" };
 
@@ -41,6 +47,13 @@ export function RadarHoy({ top }: { top: RankingRow[] }) {
 
       {/* Termómetro del mercado */}
       <div className="rounded-2xl bg-ink text-cream p-4 flex flex-wrap items-center gap-x-6 gap-y-3">
+        <div className="w-full flex flex-wrap gap-1.5" role="group" aria-label="Índice del termómetro">
+          {OPCIONES.map((o) => (
+            <button key={o.symbol} type="button" aria-pressed={idx.symbol === o.symbol} onClick={() => setIdx(o)} className={`rounded-full px-3 py-1 text-xs font-bold transition-colors ${idx.symbol === o.symbol ? "bg-terracotta text-cream" : "border border-[#3a3831] text-[#d8cdb9] hover:border-terracotta hover:text-cream"}`}>
+              {o.nombre}
+            </button>
+          ))}
+        </div>
         <div className="min-w-[9rem]">
           <p className="text-[0.65rem] uppercase tracking-wider text-[#a9a296] font-bold">Termómetro · {idx.nombre}</p>
           {lect ? (
