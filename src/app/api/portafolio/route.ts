@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { yahooSerie } from "@/lib/providers/yahoo";
+import type { PricePoint } from "@/lib/analysis/types";
 import { INDICES_COMPARABLES } from "@/lib/providers/mercados";
 import { cached } from "@/lib/providers/cache";
 import { nivelesIbkr, pesosIbkr } from "@/lib/providers/portafolioIbkr";
@@ -88,7 +89,7 @@ export async function GET(req: NextRequest) {
       vivo(indice).catch(() => null),
     ]);
     if (ibkr.length < 2) throw new Error("Todavía no hay historia de IBKR");
-    const ultimoIbkr = ibkr[ibkr.length - 1].t;
+    const ultimoOficial = ibkr[ibkr.length - 1].t;
     const hoy = v?.dia ?? aDia(Date.now());
     const anterior = sesionAnterior(sp.sesiones, hoy);
     // Yahoo deja sin cierre la barra de la sesión anterior por horas: se completa con el intradía.
@@ -97,13 +98,42 @@ export async function GET(req: NextRequest) {
       anterior,
       v?.spAnterior ?? 0,
     );
-    const historia = compararHistoria(spDiario, ibkr, inicioRango(rango, ultimoIbkr));
+    // Si la sincronización de IBKR se atrasó, los días que faltan se estiman con los pesos actuales ×
+    // cierres diarios de cada posición: el gráfico nunca se congela (esos días van punteados).
+    const serieIbkr = await completarConEstimado(ibkr, spDiario.filter((p) => p.t > ultimoOficial && anterior !== null && p.t <= anterior).map((p) => p.t), pesos);
+    const ultimoIbkr = serieIbkr[serieIbkr.length - 1].t;
+    const historia = compararHistoria(spDiario, serieIbkr, inicioRango(rango, ultimoIbkr));
     if (!historia) throw new Error("Sin datos suficientes para el periodo");
     const { comp, enVivo } = agregarVivo(historia, ultimoIbkr, anterior, v);
-    return responder({ rango, asOf: Date.now(), fuente: "ibkr", hasta: ultimoIbkr, enVivo, pesos, ...comp });
+    return responder({ rango, asOf: Date.now(), fuente: "ibkr", hasta: ultimoOficial, estimadoDesde: ultimoIbkr > ultimoOficial ? ultimoOficial : null, enVivo, pesos, ...comp });
   } catch (e) {
     return Response.json({ error: e instanceof Error ? e.message : "error" }, { status: 502 });
   }
+}
+
+/** Extiende la serie oficial de IBKR con días estimados (pesos × cierre de cada posición respecto al último día oficial). */
+async function completarConEstimado(ibkr: PricePoint[], dias: number[], pesos: Array<{ ticker: string; peso: number }>): Promise<PricePoint[]> {
+  if (!dias.length) return ibkr;
+  const series = await Promise.all(pesos.map((p) => yahooSerie(p.ticker, "3mo", "1d", 15 * MINUTO).catch(() => null)));
+  const cierre = (k: number, t: number) => {
+    let c: number | null = null;
+    for (const p of series[k]?.points ?? []) if (aDia(p.t) <= t) c = p.c;
+    return c;
+  };
+  const ult = ibkr[ibkr.length - 1];
+  const extra: PricePoint[] = [];
+  for (const d of dias) {
+    let num = 0, den = 0;
+    pesos.forEach((p, k) => {
+      const a = cierre(k, ult.t), b = cierre(k, d);
+      if (a && b) {
+        num += p.peso * (b / a);
+        den += p.peso;
+      }
+    });
+    if (den) extra.push({ t: d, c: (ult.c * num) / den });
+  }
+  return [...ibkr, ...extra];
 }
 
 /** Medio minuto en el CDN: la portada pide cada minuto y el punto "ahora" no debe quedar viejo. */

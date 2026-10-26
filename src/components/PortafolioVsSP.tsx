@@ -21,6 +21,8 @@ interface Datos {
   fuente: "ibkr" | "estimado";
   /** Último cierre que publicó IBKR (medianoche UTC) */
   hasta: number | null;
+  /** Último día oficial de IBKR cuando los siguientes son estimados (sincronización atrasada) */
+  estimadoDesde?: number | null;
   pesos: Array<{ ticker: string; peso: number }>;
 }
 
@@ -55,11 +57,14 @@ function useAncho() {
   return { ref, w };
 }
 
-function Grafico({ d, showBB, showEma, ema200, nombre }: { d: Datos; showBB: boolean; showEma: boolean; ema200: Array<{ t: number; e: number; i: number }> | null; nombre: string }) {
+const ult0 = (pts: Datos["puntos"]) => pts[pts.length - 1];
+type Mov = { fecha: string; ticker: string; tipo: "nueva" | "compra" | "venta"; pct: number | null; rent: number | null };
+
+function Grafico({ d, showBB, showEma, ema200, nombre, movs }: { d: Datos; showBB: boolean; showEma: boolean; ema200: Array<{ t: number; e: number; i: number }> | null; nombre: string; movs: Mov[] }) {
   const { ref, w } = useAncho();
   const [hover, setHover] = useState<number | null>(null);
-  const H = w < 480 ? 220 : 280;
-  const pad = { l: 44, r: 14, t: 14, b: 26 };
+  const H = w < 480 ? 240 : 320;
+  const pad = { l: 40, r: w < 480 ? 58 : 78, t: 16, b: 28 };
   const pts = d.puntos;
   // Indicadores sobre la línea del S&P 500 (base 100), en los períodos del gráfico; una EMA solo se dibuja si hay más puntos que su período.
   const cierres = pts.map((p) => p.indice);
@@ -110,7 +115,45 @@ function Grafico({ d, showBB, showEma, ema200, nombre }: { d: Datos; showBB: boo
   const marcas: number[] = [];
   // Contador entero: sumar 0.1 en bucle acumula error y salta marcas.
   for (let k = Math.ceil((min - 100) / paso); k * paso <= max - 100; k++) marcas.push(Number((k * paso).toFixed(2)));
-  const etiquetasX = pts.length > 2 ? [0, Math.floor((pts.length - 1) / 2), pts.length - 1] : [0, pts.length - 1];
+  const nX = w < 480 ? 3 : 6;
+  const etiquetasX = pts.length > nX ? Array.from({ length: nX }, (_, k) => Math.round((k * (pts.length - 1)) / (nX - 1))) : pts.map((_, i) => i);
+  // Desde qué punto el portafolio es estimado (IBKR atrasado): ese tramo va punteado
+  const iEst = d.estimadoDesde ? pts.findIndex((p) => p.t > d.estimadoDesde!) : -1;
+  const tramoPort = (desde: number, hasta: number) => {
+    let s2 = "";
+    for (let i = Math.max(0, desde); i <= hasta && i < pts.length; i++) {
+      const v = pts[i].portafolio;
+      if (v === null) continue;
+      s2 += `${s2 ? "L" : "M"}${x(i).toFixed(1)},${y(v).toFixed(1)}`;
+    }
+    return s2;
+  };
+  const iPrimero = pts.findIndex((p) => p.portafolio !== null);
+  // Compras y ventas sobre la línea del portafolio: un marcador por día (ventas mandan)
+  const marcasMov = (() => {
+    if (d.rango === "1D" || pts.length < 2) return [];
+    const porDia = new Map<number, Mov[]>();
+    for (const m of movs) {
+      const t = Date.parse(`${m.fecha}T00:00:00Z`);
+      if (t < pts[0].t || t > pts[pts.length - 1].t) continue;
+      porDia.set(t, [...(porDia.get(t) ?? []), m]);
+    }
+    return [...porDia].flatMap(([t, ms]) => {
+      let i = pts.findIndex((p) => p.t >= t);
+      if (i < 0) i = pts.length - 1;
+      const v = pts[i].portafolio;
+      return v === null ? [] : [{ i, v, venta: ms.some((m) => m.tipo === "venta"), ms }];
+    });
+  })();
+  const area = iPrimero >= 0 ? `${tramoPort(iPrimero, pts.length - 1)}L${x(pts.length - 1).toFixed(1)},${(H - pad.b).toFixed(1)}L${x(iPrimero).toFixed(1)},${(H - pad.b).toFixed(1)}Z` : "";
+  // Etiquetas al final de cada línea, separadas si se tocan
+  const yP = ult0(pts)?.portafolio != null ? y(ult0(pts)!.portafolio!) : null;
+  const yI = y(pts[pts.length - 1].indice);
+  let eP = yP ?? 0, eI = yI;
+  if (yP !== null && Math.abs(eP - eI) < 22) {
+    const m = (eP + eI) / 2;
+    if (eP <= eI) { eP = m - 11; eI = m + 11; } else { eP = m + 11; eI = m - 11; }
+  }
 
   const mover = (clientX: number) => {
     const r = ref.current?.getBoundingClientRect();
@@ -135,9 +178,15 @@ function Grafico({ d, showBB, showEma, ema200, nombre }: { d: Datos; showBB: boo
           onPointerLeave={() => setHover(null)}
           style={{ touchAction: "pan-y" }}
         >
+          <defs>
+            <linearGradient id="gradPort" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#c46d34" stopOpacity="0.28" />
+              <stop offset="100%" stopColor="#c46d34" stopOpacity="0" />
+            </linearGradient>
+          </defs>
           {marcas.map((m) => (
             <g key={m}>
-              <line x1={pad.l} x2={w - pad.r} y1={y(100 + m)} y2={y(100 + m)} stroke="var(--line-soft)" strokeDasharray={m === 0 ? "4 4" : undefined} />
+              <line x1={pad.l} x2={w - pad.r} y1={y(100 + m)} y2={y(100 + m)} stroke={m === 0 ? "var(--ink-soft)" : "var(--line-soft)"} strokeOpacity={m === 0 ? 0.5 : 1} strokeDasharray={m === 0 ? "4 4" : undefined} />
               <text x={pad.l - 8} y={y(100 + m) + 4} textAnchor="end" fontSize="11" fill="var(--ink-soft)" className="num">
                 {m > 0 ? "+" : ""}
                 {m}%
@@ -157,10 +206,37 @@ function Grafico({ d, showBB, showEma, ema200, nombre }: { d: Datos; showBB: boo
             </>
           )}
           {showEma && emaSerie && <path d={serie(emaSerie)} fill="none" stroke="var(--olive)" strokeWidth="2.5" strokeLinejoin="round" />}
-          <path d={linea("indice")} fill="none" stroke="var(--ink-soft)" strokeWidth="2" strokeLinejoin="round" />
-          <path d={linea("portafolio")} fill="none" stroke="var(--terracotta)" strokeWidth="3" strokeLinejoin="round" />
+          {area && <path d={area} fill="url(#gradPort)" />}
+          <path d={linea("indice")} fill="none" stroke="var(--ink-soft)" strokeWidth="1.75" strokeOpacity="0.85" strokeLinejoin="round" />
+          {iEst > 0 ? (
+            <>
+              <path d={tramoPort(0, iEst - 1)} fill="none" stroke="var(--terracotta)" strokeWidth="2.75" strokeLinejoin="round" strokeLinecap="round" />
+              <path d={tramoPort(iEst - 1, pts.length - 1)} fill="none" stroke="var(--terracotta)" strokeWidth="2.75" strokeDasharray="5 4" strokeLinejoin="round" />
+            </>
+          ) : (
+            <path d={linea("portafolio")} fill="none" stroke="var(--terracotta)" strokeWidth="2.75" strokeLinejoin="round" strokeLinecap="round" />
+          )}
           <circle cx={x(pts.length - 1)} cy={y(ult.indice)} r="3.5" fill="var(--ink-soft)" />
-          {ult.portafolio !== null && <circle cx={x(pts.length - 1)} cy={y(ult.portafolio)} r="4.5" fill="var(--terracotta)" />}
+          {ult.portafolio !== null && (
+            <>
+              <circle cx={x(pts.length - 1)} cy={y(ult.portafolio)} r="8" fill="var(--terracotta)" opacity="0.18" />
+              <circle cx={x(pts.length - 1)} cy={y(ult.portafolio)} r="4.5" fill="var(--terracotta)" stroke="var(--paper)" strokeWidth="1.5" />
+            </>
+          )}
+          {marcasMov.map((m) => (
+            <path key={m.i} d={m.venta ? `M${x(m.i) - 5},${y(m.v) - 12}L${x(m.i) + 5},${y(m.v) - 12}L${x(m.i)},${y(m.v) - 4}Z` : `M${x(m.i) - 5},${y(m.v) + 12}L${x(m.i) + 5},${y(m.v) + 12}L${x(m.i)},${y(m.v) + 4}Z`} fill={m.venta ? "var(--sig-avoid)" : "var(--olive-deep)"} stroke="var(--paper)" strokeWidth="1" />
+          ))}
+          {/* Valor al final de cada línea */}
+          {yP !== null && (
+            <g>
+              <rect x={w - pad.r + 8} y={eP - 10} width={pad.r - 10} height="20" rx="10" fill="var(--terracotta)" />
+              <text x={w - pad.r + 8 + (pad.r - 10) / 2} y={eP + 4} textAnchor="middle" fontSize="11" fontWeight="700" fill="#f5ead8" className="num">{fmtPct(ult.portafolio! - 100, 1, true)}</text>
+            </g>
+          )}
+          <g>
+            <rect x={w - pad.r + 8} y={eI - 10} width={pad.r - 10} height="20" rx="10" fill="var(--paper)" stroke="var(--ink-soft)" strokeOpacity="0.5" />
+            <text x={w - pad.r + 8 + (pad.r - 10) / 2} y={eI + 4} textAnchor="middle" fontSize="11" fontWeight="700" fill="var(--ink-soft)" className="num">{fmtPct(ult.indice - 100, 1, true)}</text>
+          </g>
           {iInicio > 0 && (
             <g>
               <line x1={x(iInicio)} x2={x(iInicio)} y1={pad.t} y2={H - pad.b} stroke="var(--terracotta)" strokeOpacity="0.5" strokeDasharray="3 4" />
@@ -192,6 +268,12 @@ function Grafico({ d, showBB, showEma, ema200, nombre }: { d: Datos; showBB: boo
             <span>{nombre}</span>
             <span className="num">{fmtPct(h.indice - 100, 1, true)}</span>
           </p>
+          {marcasMov.filter((m) => m.i === hover).flatMap((m) => m.ms).map((m, k) => (
+            <p key={k} className="mt-1 font-bold" style={{ color: m.tipo === "venta" ? "var(--sig-avoid)" : "var(--olive-deep)" }}>
+              {m.tipo === "venta" ? "▼ Vendió" : m.tipo === "nueva" ? "▲ Compró (nueva)" : "▲ Compró"} {m.ticker}
+              {m.tipo === "venta" && m.rent != null ? ` · ${fmtPct(m.rent, 1, true)}` : ""}
+            </p>
+          ))}
         </div>
       )}
     </div>
@@ -212,11 +294,15 @@ export function PortafolioVsSP() {
     return () => window.removeEventListener(EVENTO_INDICE, cambiar);
   }, []);
   const q = `&indice=${encodeURIComponent(idx.symbol)}`;
+  const [movs, setMovs] = useState<Mov[]>([]);
+  useEffect(() => {
+    fetch("/api/movimientos").then((r) => r.json()).then(setMovs).catch(() => {});
+  }, []);
   const [datos, setDatos] = useState<Datos | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [cargando, setCargando] = useState(true);
   const [showBB, setShowBB] = useState(false);
-  const [showEma, setShowEma] = useState(true);
+  const [showEma, setShowEma] = useState(false);
   const [ema200, setEma200] = useState<Array<{ t: number; e: number; i: number }> | null>(null);
   useEffect(() => {
     setEma200(null);
@@ -313,7 +399,7 @@ export function PortafolioVsSP() {
 
       {d ? (
         <div className={`transition-opacity ${atenuado ? "opacity-60" : ""}`} aria-busy={atenuado}>
-          <Grafico d={d} showBB={showBB} showEma={showEma} ema200={ema200} nombre={idx.nombre} />
+          <Grafico d={d} showBB={showBB} showEma={showEma} ema200={ema200} nombre={idx.nombre} movs={movs} />
         </div>
       ) : error ? (
         <div className="mt-4 flex h-[220px] items-center justify-center rounded-xl bg-cream-2/60 text-sm text-ink-soft sm:h-[280px]">No pude leer el mercado: {error}</div>
@@ -323,8 +409,13 @@ export function PortafolioVsSP() {
 
       {d && (
         <>
-          <div className="mt-3 flex flex-wrap items-center gap-2 text-[0.7rem] font-bold">
-            <span className="font-normal text-ink-soft">Sobre el {idx.nombre}:</span>
+          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-[0.72rem] font-bold">
+            <span className="inline-flex items-center gap-1.5 text-terracotta"><span className="inline-block h-[3px] w-4 rounded bg-terracotta" />Portafolio Invirtiendoo</span>
+            <span className="inline-flex items-center gap-1.5 text-ink-soft"><span className="inline-block h-[2px] w-4 rounded bg-ink-soft" />{idx.nombre}</span>
+            <span className="inline-flex items-center gap-1 text-olive-deep">▲ compra</span>
+            <span className="inline-flex items-center gap-1" style={{ color: "var(--sig-avoid)" }}>▼ venta</span>
+            {d.estimadoDesde && <span className="inline-flex items-center gap-1.5 font-normal text-ink-soft"><span className="inline-block w-4 border-t-2 border-dashed border-terracotta" />estimado hasta la próxima sincronización con IBKR</span>}
+            <span className="font-normal text-ink-soft sm:ml-auto">Sobre el {idx.nombre}:</span>
             <button type="button" aria-pressed={showEma} onClick={() => setShowEma(!showEma)} className={`rounded-full border px-2 py-0.5 ${showEma ? "border-ink" : "border-line text-ink-soft"}`}>
               <span className="mr-1 inline-block h-0.5 w-3 align-middle" style={{ background: "var(--olive)" }} />EMA 200
             </button>
