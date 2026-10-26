@@ -116,7 +116,7 @@ function useCotizaciones(tickers: string[]) {
  * solo para detectar compras/ventas) × precio de mercado de este momento. Valor, ganancia del día y ganancia total
  * no dependen del corte diario de IBKR.
  */
-export function PortafolioEnVivo({ pos, senales, efectivo, realizado }: { pos: PosicionPublica[]; senales: Record<string, { key: string; label: string } | undefined>; efectivo: number | null; realizado: number }) {
+export function PortafolioEnVivo({ pos, senales, efectivo, realizado, ventas = {} }: { pos: PosicionPublica[]; senales: Record<string, { key: string; label: string } | undefined>; efectivo: number | null; realizado: number; ventas?: Record<string, { realizado: number; costo: number }> }) {
   const tickers = pos.map((p) => p.ticker);
   const { q, asOf } = useCotizaciones(tickers);
   const rend = useCadaMinuto<Record<string, Rendimiento | null>>(pos.length ? `/api/rendimientos?symbols=${tickers.join(",")}` : null, {});
@@ -134,13 +134,17 @@ export function PortafolioEnVivo({ pos, senales, efectivo, realizado }: { pos: P
   const dia = filas.reduce((a, f) => a + (f.pnlDia ?? 0), 0);
   const pnl = filas.reduce((a, f) => a + f.pnl, 0);
   const costo = total - pnl;
+  // Rentabilidad con ventas: lo ganado en posiciones abiertas + lo ya realizado, sobre todo lo invertido (abierto + vendido)
+  const costoVendido = Object.values(ventas).reduce((a, v) => a + v.costo, 0);
+  const totalGan = pnl + realizado;
+  const rentTotal = costo + costoVendido ? (totalGan / (costo + costoVendido)) * 100 : null;
   const cuenta = total + (efectivo ?? 0);
   const ayer = cuenta - dia;
   const kpis: Array<[string, string, string?, string?]> = [
     ["Valor de la cuenta", fmtMoney(cuenta), undefined, "posiciones + efectivo"],
     ["Hoy", signo(dia), tono(dia), fmtPct(ayer ? (dia / ayer) * 100 : null, 2, true)],
-    ["Ganancia no realizada", signo(pnl), tono(pnl), fmtPct(costo ? (pnl / costo) * 100 : null, 1, true)],
-    ["Ganancia realizada", signo(realizado), tono(realizado), "ventas cerradas"],
+    ["Ganancia total", signo(totalGan), tono(totalGan), `${fmtPct(rentTotal, 1, true)} con ventas`],
+    ["No realizada · realizada", `${signo(pnl)}`, tono(pnl), `${signo(realizado)} realizada en ventas`],
     ["Invertido en posiciones", fmtMoney(costo)],
     ["Efectivo", fmtMoney(efectivo)],
   ];
@@ -169,7 +173,7 @@ export function PortafolioEnVivo({ pos, senales, efectivo, realizado }: { pos: P
       <div className="flex flex-wrap items-baseline justify-between gap-2 mb-2">
         <Eyebrow>Posiciones · en vivo</Eyebrow>
         <p className="text-xs text-ink-soft num">
-          Valor <b className="text-ink">{fmtMoney(total)}</b> · hoy <b style={{ color: tono(dia) }}>{signo(dia)}</b> · ganancia <b style={{ color: tono(pnl) }}>{signo(pnl)}</b>
+          Valor <b className="text-ink">{fmtMoney(total)}</b> · hoy <b style={{ color: tono(dia) }}>{signo(dia)}</b> · ganancia total <b style={{ color: tono(totalGan) }}>{signo(totalGan)}</b> ({fmtPct(rentTotal, 1, true)}, incluye ventas)
         </p>
       </div>
       <Card className="p-0 overflow-hidden">
@@ -206,8 +210,19 @@ export function PortafolioEnVivo({ pos, senales, efectivo, realizado }: { pos: P
                 <span className="hidden lg:block text-right">{pct(r?.m1)}</span>
                 <span className="hidden lg:block text-right">{pct(r?.m6)}</span>
                 <span className="hidden lg:block num text-right font-bold leading-tight" style={{ color: tono(pnl) }}>
-                  {signo(pnl)}
-                  <span className="block text-[0.68rem]">{fmtPct(p.precio_prom ? (precio / p.precio_prom - 1) * 100 : null, 1, true)}</span>
+                  {(() => {
+                    // Por acción: abierta + lo ya realizado al vender parte de ella, sobre el costo de ambas
+                    const v = ventas[p.ticker];
+                    const costoAbierto = (p.cantidad ?? 0) * (p.precio_prom ?? 0);
+                    const g = pnl + (v?.realizado ?? 0);
+                    const pct = costoAbierto + (v?.costo ?? 0) ? (g / (costoAbierto + (v?.costo ?? 0))) * 100 : null;
+                    return (
+                      <>
+                        {signo(g)}
+                        <span className="block text-[0.68rem]">{fmtPct(pct, 1, true)}{v ? " · incl. venta" : ""}</span>
+                      </>
+                    );
+                  })()}
                 </span>
                 <span className="hidden lg:flex justify-end">{s ? <SignalPill k={s.key as SignalKey} label={s.label} /> : <span className="text-xs text-ink-soft">ETF</span>}</span>
               </li>

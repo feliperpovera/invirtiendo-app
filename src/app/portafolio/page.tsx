@@ -28,6 +28,13 @@ export default async function PortafolioPage() {
   const senal = new Map(rk.map((r) => [r.ticker, r]));
   const act = res?.actualizado ?? pos[0]?.actualizado;
   const realizado = mov.reduce((a, m) => a + (m.pnl_realizado ?? 0), 0);
+  // Ventas por acción: ganancia realizada y el costo que se dio de baja (monto de la venta − ganancia)
+  const ventas: Record<string, { realizado: number; costo: number }> = {};
+  for (const m of mov) if (m.tipo === "venta" && m.monto != null) {
+    const v = (ventas[m.ticker] ??= { realizado: 0, costo: 0 });
+    v.realizado += m.pnl_realizado ?? 0;
+    v.costo += m.monto - (m.pnl_realizado ?? 0);
+  }
 
   return (
     <div className="pt-10 space-y-6">
@@ -44,7 +51,7 @@ export default async function PortafolioPage() {
 
       <TermometroIndices />
 
-      <PortafolioEnVivo pos={pos} efectivo={res?.efectivo ?? null} realizado={realizado} senales={Object.fromEntries(pos.map((p) => [p.ticker, senal.get(p.ticker)?.senal_key ? { key: senal.get(p.ticker)!.senal_key!, label: senal.get(p.ticker)!.senal ?? "" } : undefined]))} />
+      <PortafolioEnVivo pos={pos} efectivo={res?.efectivo ?? null} realizado={realizado} ventas={ventas} senales={Object.fromEntries(pos.map((p) => [p.ticker, senal.get(p.ticker)?.senal_key ? { key: senal.get(p.ticker)!.senal_key!, label: senal.get(p.ticker)!.senal ?? "" } : undefined]))} />
 
       <section className="space-y-2">
         <Eyebrow>Cómo se mueve la cuenta · frente al S&amp;P 500</Eyebrow>
