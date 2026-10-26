@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { SearchBox } from "@/components/SearchBox";
 import { MarketPulseCard } from "@/components/MarketPulse";
-import { PortafolioVsSP } from "@/components/PortafolioVsSP";
+import { RadarHoy } from "@/components/RadarHoy";
+import { leerRanking } from "@/lib/providers/ranking";
 import { IndicesMundo } from "@/components/IndicesMundo";
 import { WatchlistTable } from "@/components/WatchlistTable";
 import { Eyebrow } from "@/components/ui";
@@ -16,7 +17,11 @@ const UNIVERSE: Array<{ title: string; tickers: string[] }> = [
 
 const ETFS = ["QQQM", "VOO", "SPLG", "SMH", "SCHD", "VTI"];
 
-export default function Home() {
+export const revalidate = 600;
+
+export default async function Home() {
+  // Top 5 del radar: Strong Buy de calidad (A/B), por margen de seguridad; descuentos de 80%+ ya salen como Watch
+  const top = (await leerRanking(300)).filter((r) => r.senal_key === "strong" && (r.grade === "A" || r.grade === "B")).sort((a, b) => (b.mos ?? 0) - (a.mos ?? 0)).slice(0, 5);
   return (
     <div className="space-y-8 pt-6">
       <IndicesMundo />
@@ -31,7 +36,7 @@ export default function Home() {
         </div>
       </section>
 
-      <PortafolioVsSP />
+      <RadarHoy top={top} />
 
       <section className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {UNIVERSE.map((u) => (

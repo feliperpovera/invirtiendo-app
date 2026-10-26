@@ -29,7 +29,7 @@ export function IndicesMundo() {
   return (
     <section aria-label="Índices del mundo">
       <div className="flex items-baseline justify-between mb-2">
-        <p className="eyebrow">Índices del mundo · toca uno para verlo abajo</p>
+        <p className="eyebrow">Índices del mundo · toca uno para ver su termómetro</p>
         <a href="/mercados" className="text-xs underline text-ink-soft">Ver mercados</a>
       </div>
       <div className="scroll-x -mx-1 px-1">
