@@ -164,6 +164,7 @@ export function PortafolioEnVivo({ pos, senales, efectivo, realizado }: { pos: P
         ))}
       </div>
     </section>
+    <Torta filas={filas.map((f) => ({ ticker: f.p.ticker, valor: f.valor }))} efectivo={efectivo ?? 0} />
     <section>
       <div className="flex flex-wrap items-baseline justify-between gap-2 mb-2">
         <Eyebrow>Posiciones · en vivo</Eyebrow>
@@ -216,5 +217,49 @@ export function PortafolioEnVivo({ pos, senales, efectivo, realizado }: { pos: P
       </Card>
     </section>
     </>
+  );
+}
+
+const PALETA = ["#c46d34", "#6b6e55", "#22211d", "#8c2f1b", "#a9a296", "#8b8d6f", "#d9a27a", "#565a43", "#64615a", "#e3c9a8", "#3a3831"];
+
+/** Diagrama de torta (dona) del portafolio con los valores en vivo; efectivo como porción aparte. */
+function Torta({ filas, efectivo }: { filas: Array<{ ticker: string; valor: number }>; efectivo: number }) {
+  const datos = [...filas].sort((a, b) => b.valor - a.valor).concat(efectivo > 0 ? [{ ticker: "Efectivo", valor: efectivo }] : []);
+  const total = datos.reduce((a, d) => a + d.valor, 0);
+  const [hover, setHover] = useState<string | null>(null);
+  if (!total) return null;
+  const R = 90, r = 56, C = 100;
+  let ang = -Math.PI / 2;
+  const arcos = datos.map((d, i) => {
+    const a0 = ang, a1 = ang + (d.valor / total) * Math.PI * 2;
+    ang = a1;
+    const p = (rad: number, a: number) => `${C + rad * Math.cos(a)},${C + rad * Math.sin(a)}`;
+    const grande = a1 - a0 > Math.PI ? 1 : 0;
+    return { ...d, color: d.ticker === "Efectivo" ? "#d9cbb3" : PALETA[i % PALETA.length], path: `M${p(R, a0)} A${R},${R} 0 ${grande} 1 ${p(R, a1)} L${p(r, a1)} A${r},${r} 0 ${grande} 0 ${p(r, a0)} Z` };
+  });
+  const foco = arcos.find((a) => a.ticker === hover) ?? arcos[0];
+  return (
+    <section>
+      <Eyebrow className="mb-2">Cómo está repartido el portafolio</Eyebrow>
+      <Card className="p-4 flex flex-col sm:flex-row items-center gap-6">
+        <svg viewBox="0 0 200 200" className="w-52 h-52 shrink-0" role="img" aria-label="Distribución del portafolio por posición">
+          {arcos.map((a) => (
+            <path key={a.ticker} d={a.path} fill={a.color} stroke="var(--paper)" strokeWidth="1.5" opacity={hover && hover !== a.ticker ? 0.45 : 1} onMouseEnter={() => setHover(a.ticker)} onMouseLeave={() => setHover(null)} className="transition-opacity cursor-pointer" />
+          ))}
+          <text x="100" y="94" textAnchor="middle" fontSize="15" fontWeight="700" fill="var(--ink)">{foco.ticker}</text>
+          <text x="100" y="114" textAnchor="middle" fontSize="13" fill="var(--ink-soft)">{((foco.valor / total) * 100).toFixed(1)}%</text>
+        </svg>
+        <ul className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-sm w-full">
+          {arcos.map((a) => (
+            <li key={a.ticker} className="flex items-center gap-2" onMouseEnter={() => setHover(a.ticker)} onMouseLeave={() => setHover(null)}>
+              <span className="h-3 w-3 rounded-sm shrink-0" style={{ background: a.color }} />
+              <b className="w-16">{a.ticker}</b>
+              <span className="num text-ink-soft">{((a.valor / total) * 100).toFixed(1)}%</span>
+              <span className="num text-xs text-ink-soft ml-auto">{fmtMoney(a.valor)}</span>
+            </li>
+          ))}
+        </ul>
+      </Card>
+    </section>
   );
 }
