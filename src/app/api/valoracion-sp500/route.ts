@@ -10,14 +10,15 @@ const VOL: Record<string, string> = { "^GSPC": "^VIX", "^NDX": "^VXN", "^DJI": "
 export async function GET(req: Request) {
   const pedido = new URL(req.url).searchParams.get("symbol") ?? "^GSPC";
   const symbol = pedido in INDICES_COMPARABLES ? pedido : "^GSPC";
+  const largo = new URL(req.url).searchParams.get("largo") === "1"; // ~3 años para el Fear & Greed de /mercados
   try {
     const data = await cached(`valoracion:v2:${symbol}`, 10 * 60_000, async () => {
       const [sp, vix] = await Promise.all([yahooSerie(symbol, "5y", "1d", 10 * 60_000), yahooSerie(VOL[symbol] ?? "^VIX", "5y", "1d", 10 * 60_000).catch(() => yahooSerie("^VIX", "5y", "1d", 10 * 60_000))]);
       const serie = calcularValoracion(sp.points, vix.points);
       const ult = serie[serie.length - 1];
-      return { symbol, volatilidad: VOL[symbol] ?? "^VIX", asOf: Date.now(), actual: { ...ult, zona: zona(ult.nivel) }, serie: serie.slice(-260) };
+      return { symbol, volatilidad: VOL[symbol] ?? "^VIX", asOf: Date.now(), actual: { ...ult, zona: zona(ult.nivel) }, serie };
     });
-    return Response.json(data, { headers: { "Cache-Control": "s-maxage=300" } });
+    return Response.json({ ...data, serie: data.serie.slice(largo ? -760 : -260) }, { headers: { "Cache-Control": "s-maxage=300" } });
   } catch (e) {
     return Response.json({ error: e instanceof Error ? e.message : "error" }, { status: 502 });
   }

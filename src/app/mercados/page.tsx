@@ -4,7 +4,7 @@ import { mercados } from "@/lib/providers/mercados";
 import { Card, Eyebrow } from "@/components/ui";
 import { Sparkline } from "@/components/charts";
 import { fmtPct } from "@/lib/format";
-import { ValoracionSP } from "@/components/ValoracionSP";
+import { FearGreed } from "@/components/FearGreed";
 
 export const metadata: Metadata = { title: "Mercados" };
 
@@ -22,7 +22,7 @@ export default async function MercadosPage() {
         <h1 className="font-display text-4xl sm:text-5xl leading-none">El mercado de un vistazo.</h1>
         <p className="text-ink-soft mt-3 text-sm">Índices, tasas, dólar, materias primas y cripto. Precios con hasta 15 min de retraso (Yahoo Finance).</p>
       </div>
-      <ValoracionSP />
+      <FearGreed />
       {m.length === 0 && <p className="text-ink-soft text-sm">No pudimos cargar los precios en este momento. Recarga la página en unos segundos.</p>}
       {grupos.map((g) => (
         <section key={g}>
