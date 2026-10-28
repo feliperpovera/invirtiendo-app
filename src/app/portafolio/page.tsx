@@ -59,7 +59,9 @@ export default async function PortafolioPage({ searchParams }: { searchParams: P
         <Eyebrow>{CUENTAS.find((c) => c.id === cuenta)!.titulo}</Eyebrow>
         <h1 className="font-display text-4xl sm:text-5xl leading-none">{CUENTAS.find((c) => c.id === cuenta)!.h1}</h1>
         <p className="text-ink-soft mt-3 max-w-2xl text-sm">
-          Cada acción, cada compra y cada venta de nuestra cuenta en Interactive Brokers. Valor y ganancias se calculan en vivo con precios de mercado sobre nuestras posiciones; las posiciones se revisan contra IBKR una vez al día
+          {principal
+            ? "Cada acción, cada compra y cada venta de nuestra cuenta en Interactive Brokers. Valor y ganancias se calculan en vivo con precios de mercado sobre nuestras posiciones; las posiciones se revisan contra IBKR una vez al día"
+            : "Posiciones de la cuenta GA en Interactive Brokers. Valor y ganancias se calculan en vivo con precios de mercado sobre sus cantidades y precio promedio; las posiciones se actualizan cuando hay compras o ventas"}
           {act ? ` (última revisión ${new Date(act).toLocaleDateString("es-CO", { timeZone: "America/Bogota", day: "numeric", month: "short" })})` : ""}.
         </p>
       </div>
