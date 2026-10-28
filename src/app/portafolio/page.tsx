@@ -25,8 +25,8 @@ const TIPO: Record<MovimientoPublico["tipo"], { txt: string; color: string }> = 
 
 /** Cuentas públicas: #1 la de Invirtiendoo (sincronizada con IBKR) y #2 GA (cargada a mano desde su app de IBKR). */
 const CUENTAS = [
-  { id: "principal", titulo: "Portafolio #1 · Invirtiendoo" },
-  { id: "ga", titulo: "Portafolio #2 · GA" },
+  { id: "principal", titulo: "Portafolio Invirtiendoo", h1: "Nuestra cuenta real, a la vista." },
+  { id: "ga", titulo: "Portafolio GA", h1: "Portafolio GA, a la vista." },
 ];
 
 export default async function PortafolioPage({ searchParams }: { searchParams: Promise<{ cuenta?: string }> }) {
@@ -46,17 +46,18 @@ export default async function PortafolioPage({ searchParams }: { searchParams: P
   }
 
   return (
-    <div className="pt-10 space-y-6">
+    <div className="pt-8 space-y-6">
+      {/* Selector de portafolio: lo primero de la página */}
+      <nav className="inline-flex rounded-full bg-ink p-1 shadow-sm" aria-label="Elegir portafolio">
+        {CUENTAS.map((c) => (
+          <Link key={c.id} href={c.id === "principal" ? "/portafolio" : `/portafolio?cuenta=${c.id}`} aria-current={c.id === cuenta ? "page" : undefined} className={`rounded-full px-5 py-2 text-sm font-bold transition-colors ${c.id === cuenta ? "bg-terracotta text-cream" : "text-[#d8cdb9] hover:text-cream"}`}>
+            {c.titulo}
+          </Link>
+        ))}
+      </nav>
       <div>
-        <Eyebrow>Portafolio Invirtiendoo</Eyebrow>
-        <h1 className="font-display text-4xl sm:text-5xl leading-none">Nuestra cuenta real, a la vista.</h1>
-        <nav className="mt-4 flex flex-wrap gap-2" aria-label="Elegir portafolio">
-          {CUENTAS.map((c) => (
-            <Link key={c.id} href={c.id === "principal" ? "/portafolio" : `/portafolio?cuenta=${c.id}`} aria-current={c.id === cuenta ? "page" : undefined} className={`rounded-full px-4 py-1.5 text-sm font-bold transition-colors ${c.id === cuenta ? "bg-ink text-cream" : "border border-line text-ink-soft hover:border-ink"}`}>
-              {c.titulo}
-            </Link>
-          ))}
-        </nav>
+        <Eyebrow>{CUENTAS.find((c) => c.id === cuenta)!.titulo}</Eyebrow>
+        <h1 className="font-display text-4xl sm:text-5xl leading-none">{CUENTAS.find((c) => c.id === cuenta)!.h1}</h1>
         <p className="text-ink-soft mt-3 max-w-2xl text-sm">
           Cada acción, cada compra y cada venta de nuestra cuenta en Interactive Brokers. Valor y ganancias se calculan en vivo con precios de mercado sobre nuestras posiciones; las posiciones se revisan contra IBKR una vez al día
           {act ? ` (última revisión ${new Date(act).toLocaleDateString("es-CO", { timeZone: "America/Bogota", day: "numeric", month: "short" })})` : ""}.
