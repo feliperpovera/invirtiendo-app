@@ -9,6 +9,6 @@ async function leer<T>(q: string): Promise<T[]> {
   const r = await fetch(`${url}/rest/v1/${q}`, { headers: { apikey: key, Authorization: `Bearer ${key}` }, cache: "no-store" });
   return r.ok ? ((await r.json()) as T[]) : [];
 }
-export const leerPosiciones = () => leer<PosicionPublica>("portafolio_posiciones?select=*&order=peso.desc");
-export const leerMovimientos = () => leer<MovimientoPublico>("portafolio_movimientos?select=fecha,ticker,tipo,pct_posicion,rent_pct,cantidad,precio,monto,pnl_realizado&order=fecha.desc,id.desc");
+export const leerPosiciones = (cuenta = "principal") => leer<PosicionPublica>(`portafolio_posiciones?select=*&cuenta=eq.${cuenta}&order=valor.desc`);
+export const leerMovimientos = (cuenta = "principal") => leer<MovimientoPublico>(`portafolio_movimientos?select=fecha,ticker,tipo,pct_posicion,rent_pct,cantidad,precio,monto,pnl_realizado&cuenta=eq.${cuenta}&order=fecha.desc,id.desc`);
 export const leerResumen = async () => (await leer<ResumenPublico>("portafolio_resumen?select=nav,efectivo,actualizado"))[0] ?? null;

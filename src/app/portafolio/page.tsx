@@ -23,8 +23,17 @@ const TIPO: Record<MovimientoPublico["tipo"], { txt: string; color: string }> = 
   venta: { txt: "Venta parcial", color: "var(--terracotta-deep)" },
 };
 
-export default async function PortafolioPage() {
-  const [pos, mov, res, rk] = await Promise.all([leerPosiciones(), leerMovimientos(), leerResumen(), leerRanking(200)]);
+/** Cuentas públicas: #1 la de Invirtiendoo (sincronizada con IBKR) y #2 GA (cargada a mano desde su app de IBKR). */
+const CUENTAS = [
+  { id: "principal", titulo: "Portafolio #1 · Invirtiendoo" },
+  { id: "ga", titulo: "Portafolio #2 · GA" },
+];
+
+export default async function PortafolioPage({ searchParams }: { searchParams: Promise<{ cuenta?: string }> }) {
+  const pedida = (await searchParams).cuenta;
+  const cuenta = CUENTAS.some((c) => c.id === pedida) ? pedida! : "principal";
+  const principal = cuenta === "principal";
+  const [pos, mov, res, rk] = await Promise.all([leerPosiciones(cuenta), leerMovimientos(cuenta), principal ? leerResumen() : Promise.resolve(null), leerRanking(200)]);
   const senal = new Map(rk.map((r) => [r.ticker, r]));
   const act = res?.actualizado ?? pos[0]?.actualizado;
   const realizado = mov.reduce((a, m) => a + (m.pnl_realizado ?? 0), 0);
@@ -41,6 +50,13 @@ export default async function PortafolioPage() {
       <div>
         <Eyebrow>Portafolio Invirtiendoo</Eyebrow>
         <h1 className="font-display text-4xl sm:text-5xl leading-none">Nuestra cuenta real, a la vista.</h1>
+        <nav className="mt-4 flex flex-wrap gap-2" aria-label="Elegir portafolio">
+          {CUENTAS.map((c) => (
+            <Link key={c.id} href={c.id === "principal" ? "/portafolio" : `/portafolio?cuenta=${c.id}`} aria-current={c.id === cuenta ? "page" : undefined} className={`rounded-full px-4 py-1.5 text-sm font-bold transition-colors ${c.id === cuenta ? "bg-ink text-cream" : "border border-line text-ink-soft hover:border-ink"}`}>
+              {c.titulo}
+            </Link>
+          ))}
+        </nav>
         <p className="text-ink-soft mt-3 max-w-2xl text-sm">
           Cada acción, cada compra y cada venta de nuestra cuenta en Interactive Brokers. Valor y ganancias se calculan en vivo con precios de mercado sobre nuestras posiciones; las posiciones se revisan contra IBKR una vez al día
           {act ? ` (última revisión ${new Date(act).toLocaleDateString("es-CO", { timeZone: "America/Bogota", day: "numeric", month: "short" })})` : ""}.
@@ -53,16 +69,19 @@ export default async function PortafolioPage() {
 
       <PortafolioEnVivo pos={pos} efectivo={res?.efectivo ?? null} realizado={realizado} ventas={ventas} senales={Object.fromEntries(pos.map((p) => [p.ticker, senal.get(p.ticker)?.senal_key ? { key: senal.get(p.ticker)!.senal_key!, label: senal.get(p.ticker)!.senal ?? "" } : undefined]))} />
 
-      <section className="space-y-2">
-        <Eyebrow>Cómo se mueve la cuenta · frente al S&amp;P 500</Eyebrow>
-        <RendimientoCuenta />
-      </section>
+      {principal && (
+        <section className="space-y-2">
+          <Eyebrow>Cómo se mueve la cuenta · frente al S&amp;P 500</Eyebrow>
+          <RendimientoCuenta />
+        </section>
+      )}
 
-      <PortafolioVsSP />
+      {principal && <PortafolioVsSP />}
 
 
       <PosicionesGraficas tickers={pos.map((p) => p.ticker)} movimientos={mov.map((m) => ({ fecha: m.fecha, ticker: m.ticker, tipo: m.tipo }))} />
 
+      {mov.length > 0 && (
       <section>
         <Eyebrow className="mb-2">Movimientos · compras y ventas</Eyebrow>
         <Card className="p-0 overflow-hidden">
@@ -94,6 +113,7 @@ export default async function PortafolioPage() {
           </ul>
         </Card>
       </section>
+      )}
 
       <p className="text-xs text-ink-soft border-t border-line pt-3">
         Fuente: Interactive Brokers (posiciones, operaciones y valor de la cuenta). Compra prom. y ganancia según IBKR; la ganancia realizada es la que reporta IBKR en cada venta, después de comisiones. La rentabilidad de la cuenta en la gráfica es ponderada en el tiempo (TWR). Contenido educativo; no es una recomendación.
