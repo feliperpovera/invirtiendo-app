@@ -14,7 +14,7 @@ function MiniLine({ title, data, suffix = "%" }: { title: string; data: Array<{ 
         {last ? `${last.c.toFixed(1)}${suffix}` : "—"}
         {first && last && pts.length > 2 && <span className="text-xs text-ink-soft font-normal"> · desde {first.c.toFixed(1)}{suffix}</span>}
       </p>
-      <Sparkline points={pts} width={180} height={40} stroke="var(--olive)" fill={false} />
+      <Sparkline points={pts} width={180} height={40} stroke="var(--olive)" fill={false} responsive />
     </div>
   );
 }

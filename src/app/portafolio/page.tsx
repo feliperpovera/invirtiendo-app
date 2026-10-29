@@ -10,7 +10,9 @@ import { TickerLogo } from "@/components/TickerLogo";
 import { Card, Eyebrow } from "@/components/ui";
 import { fmtMoney, fmtPct } from "@/lib/format";
 
-export const metadata: Metadata = { title: "Portafolio Invirtiendoo" };
+export async function generateMetadata({ searchParams }: { searchParams: Promise<{ cuenta?: string }> }): Promise<Metadata> {
+  return { title: (await searchParams).cuenta === "ga" ? "Portafolio GA" : "Portafolio Invirtiendoo" };
+}
 export const dynamic = "force-dynamic";
 
 const fecha = (iso: string) => new Date(`${iso}T12:00:00Z`).toLocaleDateString("es-CO", { day: "numeric", month: "short", year: "numeric" });
@@ -90,20 +92,22 @@ export default async function PortafolioPage({ searchParams }: { searchParams: P
         <Card className="p-0 overflow-hidden">
           <ul className="divide-y divide-line">
             {mov.map((m) => (
-              <li key={`${m.fecha}${m.ticker}${m.tipo}`} className="grid grid-cols-[5.5rem_minmax(0,1fr)_auto] gap-x-3 items-center px-4 py-2 text-sm">
-                <span className="text-xs text-ink-soft num">{fecha(m.fecha)}</span>
+              <li key={m.ref} className="grid grid-cols-[minmax(0,1fr)_auto] sm:grid-cols-[5.5rem_minmax(0,1fr)_auto] gap-x-3 items-center px-4 py-2 text-sm">
+                <span className="col-span-2 sm:col-span-1 text-xs text-ink-soft num">{fecha(m.fecha)}</span>
                 <Link href={`/accion/${m.ticker}`} className="flex items-center gap-2 min-w-0 hover:text-terracotta">
                   <TickerLogo symbol={m.ticker} size={22} />
-                  <b>{m.ticker}</b>
-                  <span className="text-xs font-bold truncate" style={{ color: TIPO[m.tipo].color }}>{m.tipo === "venta" && (m.pct_posicion ?? 0) >= 99.9 ? "Venta total" : TIPO[m.tipo].txt}</span>
+                  <span className="flex flex-col sm:flex-row sm:items-center sm:gap-2 min-w-0 leading-tight">
+                    <b>{m.ticker}</b>
+                    <span className="text-xs font-bold" style={{ color: TIPO[m.tipo].color }}>{m.tipo === "venta" && (m.pct_posicion ?? 0) >= 99.9 ? "Venta total" : TIPO[m.tipo].txt}</span>
+                  </span>
                 </Link>
                 <span className="text-xs text-right num leading-tight">
-                  {cant(m.cantidad)} × {fmtMoney(m.precio)} = <b>{fmtMoney(m.monto)}</b>
+                  <span className="whitespace-nowrap">{cant(m.cantidad)} × {fmtMoney(m.precio)} = <b>{fmtMoney(m.monto)}</b></span>
                   <span className="block text-ink-soft">
                     {m.tipo === "compra" && m.pct_posicion != null && `+${m.pct_posicion.toFixed(0)}% a la posición`}
                     {m.tipo === "venta" && (
                       <>
-                        {m.pct_posicion?.toFixed(0)}% de la posición ·{" "}
+                        {m.pct_posicion?.toFixed(0)}% de la posición<span className="hidden sm:inline"> · </span><br className="sm:hidden" />
                         <b style={{ color: color(m.pnl_realizado) }}>
                           {signo(m.pnl_realizado)} ({fmtPct(m.rent_pct, 1, true)})
                         </b>
