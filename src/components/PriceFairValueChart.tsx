@@ -5,6 +5,7 @@ import type { PriceHistory, N } from "@/lib/analysis/types";
 import type { FvHistory } from "@/lib/analysis/fvhistory";
 import { fmtMoney, fmtPct, isNum, clamp } from "@/lib/format";
 import { ema, bollinger } from "@/lib/indicadores";
+import { detectarPatrones, PATRONES } from "@/lib/tecnico";
 import type { Movimiento } from "@/lib/providers/radar";
 
 type FilaPoder = { persona: string; trece: boolean; compra: Movimiento | null; venta: Movimiento | null };
@@ -63,6 +64,7 @@ export function PriceFairValueChart({
       .catch(() => setPoder([]));
   }, [history.symbol]);
   const [showEma, setShowEma] = useState(true);
+  const [velas, setVelas] = useState(true);
   const W = 1000;
   const H = height;
   const PAD = { t: 20, r: 96, b: 30, l: 8 };
@@ -70,16 +72,21 @@ export function PriceFairValueChart({
   const model = useMemo(() => {
     const years = RANGES.find((r) => r.k === range)!.years;
     const from = asOf - years * 365 * 86400000;
-    const src = years <= 2 ? history.daily : years <= 5 ? history.weekly : history.monthly;
-    const all = src.length ? src : history.daily;
-    // Indicadores sobre toda la serie (así arrancan llenos en el borde izquierdo) y luego se recorta al rango
+    // Diario hasta 1 año; semanal y mensual en los largos (así las velas no quedan de un píxel)
+    const pick = years <= 1 ? history.daily : years <= 5 ? history.weekly : history.monthly;
+    const all = pick.length ? pick : history.daily;
+    const diario = all === history.daily;
+    // Indicadores sobre toda la serie (así arrancan llenos en el borde izquierdo) y luego se recorta al rango.
+    // EMA de 200 días equivalente: 40 semanas o 10 meses según la frecuencia de la serie.
     const closes = all.map((p) => p.c);
-    const e200 = ema(closes, 200);
+    const e200 = ema(closes, diario ? 200 : all === history.weekly ? 40 : 10);
+    const pats = diario ? detectarPatrones(all).filter((p) => p.tipo !== "neutral") : [];
     const bb = bollinger(closes);
     const first = all.findIndex((p) => p.t >= from);
     const price = first < 0 ? [] : all.slice(first);
     if (price.length < 5) return null;
     const ind = { e200: e200.slice(first), bb: bb.slice(first) };
+    const patrones = pats.filter((p) => p.i >= first).map((p) => ({ ...p, i: p.i - first }));
 
     const t0 = price[0].t;
     // La proyección ocupa como mucho la mitad del rango visible: en 1M no se estira 12 meses
@@ -87,9 +94,14 @@ export function PriceFairValueChart({
     const t1 = fv ? Math.min(fv.targetDate, asOf + span * 0.5) : price[price.length - 1].t;
     const fvPts = (fv?.points ?? []).filter((p) => p.t >= t0 - 120 * 86400000);
     const ys: number[] = [...price.map((p) => p.c), current];
+    if (velas) for (const p of price) if (p.h != null && p.l != null) ys.push(p.h, p.l);
     if (showBB) for (const b of ind.bb) if (b) ys.push(b.up, b.dn);
-    for (const p of fvPts) ys.push(p.lo, p.hi);
-    if (fv) {
+    // Con velas el eje sigue al precio: en rangos cortos (≤6M) solo precio y EMA; en los largos sin la banda.
+    // Lo que queda fuera se recorta y su etiqueta se pega al borde.
+    const soloPrecio = velas && years <= 0.5;
+    if (soloPrecio) for (const v of ind.e200) ys.push(v);
+    else for (const p of fvPts) ys.push(...(velas ? [p.fv] : [p.lo, p.hi]));
+    if (fv && !soloPrecio) {
       if (isNum(fv.fairValueNow)) ys.push(fv.fairValueNow);
       if (isNum(fv.targetOwn)) ys.push(fv.targetOwn);
       if (isNum(fv.targetAnalyst)) ys.push(fv.targetAnalyst);
@@ -101,8 +113,8 @@ export function PriceFairValueChart({
     const yMax = hi + pad;
     const X = (t: number) => PAD.l + ((t - t0) / (t1 - t0 || 1)) * (W - PAD.l - PAD.r);
     const Y = (v: number) => PAD.t + (1 - (v - yMin) / (yMax - yMin || 1)) * (H - PAD.t - PAD.b);
-    return { price, ind, fvPts, t0, t1, yMin, yMax, X, Y, years };
-  }, [history, fv, current, asOf, range, showBB, H, PAD.l, PAD.r, PAD.t, PAD.b, W]);
+    return { price, ind, patrones, fvPts, t0, t1, yMin, yMax, X, Y, years };
+  }, [history, fv, current, asOf, range, showBB, velas, H, PAD.l, PAD.r, PAD.t, PAD.b, W]);
 
   const selector = (
     <div className="flex flex-wrap gap-1" role="group" aria-label="Rango del gráfico">
@@ -128,7 +140,12 @@ export function PriceFairValueChart({
       </div>
     );
   }
-  const { price, ind, fvPts, t0, t1, yMin, yMax, X, Y, years } = model;
+  const { price, ind, patrones, fvPts, t0, t1, yMin, yMax, X, Y, years } = model;
+  const conVelas = velas && price.some((p) => p.o != null);
+  // Ancho de cada vela: 65% del espacio entre barras
+  const barW = price.length > 1 ? ((X(price[price.length - 1].t) - X(price[0].t)) / (price.length - 1)) * 0.65 : 4;
+  // Marcas de patrones solo cuando las velas se distinguen (hasta ~6 meses diarios)
+  const marcasVela = conVelas && price.length <= 160 ? patrones : [];
 
   const line = (pts: Array<{ x: number; y: number }>) => pts.map((p, i) => `${i ? "L" : "M"}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
   const pricePts = price.map((p) => ({ x: X(p.t), y: Y(p.c), t: p.t, c: p.c }));
@@ -264,7 +281,10 @@ export function PriceFairValueChart({
   // Etiquetas del margen derecho, separadas para que no se solapen
   const marks: Array<{ label: string; text: string; color: string; y: number }> = [];
   const push = (label: string, v: N, color: string) => {
-    if (isNum(v)) marks.push({ label, text: fmtMoney(v, 0), color, y: Y(v) });
+    if (!isNum(v)) return;
+    const y = Y(v);
+    const fuera = y < PAD.t ? "↑ " : y > H - PAD.b ? "↓ " : "";
+    marks.push({ label, text: fuera + fmtMoney(v, 0), color, y: clamp(y, PAD.t, H - PAD.b) });
   };
   push("precio", current, "var(--ink)");
   if (fv) {
@@ -284,6 +304,10 @@ export function PriceFairValueChart({
       <div className="flex items-center justify-between gap-3 mb-2 flex-wrap">
         <p className="text-sm">
           <span className="text-ink-soft">{fmtDay(shown.t)}</span> · <b className="num">{fmtMoney(shown.c)}</b>
+          {hoverPt && conVelas && (() => {
+            const b = price.find((p) => p.t === hoverPt.t);
+            return b?.o != null ? <span className="num text-xs text-ink-soft"> (A {fmtMoney(b.o)} · Máx {fmtMoney(b.h)} · Mín {fmtMoney(b.l)})</span> : null;
+          })()}
           {isNum(shownFv) && (
             <>
               {" "}
@@ -336,11 +360,15 @@ export function PriceFairValueChart({
             <line key={`d${d.t}`} x1={X(d.t)} x2={X(d.t)} y1={H - PAD.b - 12} y2={H - PAD.b} stroke="var(--terracotta)" strokeWidth="2" vectorEffect="non-scaling-stroke" opacity="0.8" />
           ))}
 
+          <clipPath id="pfv-area">
+            <rect x={PAD.l} y={PAD.t} width={W - PAD.l - PAD.r} height={H - PAD.t - PAD.b} />
+          </clipPath>
+          <g clipPath="url(#pfv-area)">
           {bandPath && <path d={bandPath} fill="var(--olive-2)" opacity="0.38" />}
           {fvPath && <path d={fvPath} fill="none" stroke="var(--olive-deep)" strokeWidth="2.5" vectorEffect="non-scaling-stroke" strokeLinejoin="round" />}
           {!fvPath && fv && isNum(fv.fairValueNow) && (
             <>
-              <rect x={PAD.l} y={Y(fv.fairValueNow * (1 + fv.band))} width={now - PAD.l} height={Math.abs(Y(fv.fairValueNow * (1 - fv.band)) - Y(fv.fairValueNow * (1 + fv.band)))} fill="var(--olive-2)" opacity="0.3" />
+              <rect clipPath="url(#pfv-area)" x={PAD.l} y={Y(fv.fairValueNow * (1 + fv.band))} width={now - PAD.l} height={Math.abs(Y(fv.fairValueNow * (1 - fv.band)) - Y(fv.fairValueNow * (1 + fv.band)))} fill="var(--olive-2)" opacity="0.3" />
               <line x1={PAD.l} x2={now} y1={Y(fv.fairValueNow)} y2={Y(fv.fairValueNow)} stroke="var(--olive-deep)" strokeWidth="2.5" strokeDasharray="8 4" vectorEffect="non-scaling-stroke" />
             </>
           )}
@@ -375,6 +403,7 @@ export function PriceFairValueChart({
               })()}
             </>
           )}
+          </g>
 
           {showBB && bbBand && (
             <>
@@ -394,7 +423,22 @@ export function PriceFairValueChart({
           {zonasPoder.map((z) => (
             <rect key={`zp${z.quien}`} x={Math.max(PAD.l, X(z.t))} width={Math.max(0, now - Math.max(PAD.l, X(z.t)))} y={Y(z.hi) - 2} height={Math.max(4, Y(z.lo) - Y(z.hi) + 4)} fill={PODER[z.quien].color} opacity="0.13" />
           ))}
-          <path d={line(pricePts)} fill="none" stroke="var(--ink)" strokeWidth="2" vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
+          {conVelas ? (
+            price.map((p, i) => {
+              if (p.o == null || p.h == null || p.l == null) return null;
+              const col = p.c >= p.o ? "var(--sig-strong)" : "var(--sig-avoid)";
+              const x = pricePts[i].x;
+              const top = Y(Math.max(p.o, p.c));
+              return (
+                <g key={p.t}>
+                  <line x1={x} x2={x} y1={Y(p.h)} y2={Y(p.l)} stroke={col} strokeWidth="1" vectorEffect="non-scaling-stroke" />
+                  <rect x={x - barW / 2} width={barW} y={top} height={Math.max(1, Y(Math.min(p.o, p.c)) - top)} fill={col} />
+                </g>
+              );
+            })
+          ) : (
+            <path d={line(pricePts)} fill="none" stroke="var(--ink)" strokeWidth="2" vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
+          )}
           <line x1={now} x2={now} y1={PAD.t} y2={H - PAD.b} stroke="var(--ink-soft)" strokeWidth="1.5" strokeDasharray="4 4" vectorEffect="non-scaling-stroke" />
           <circle cx={now} cy={Y(current)} r="4.5" fill="var(--ink)" />
           {opsPoder.map((o, i) => (
@@ -428,6 +472,20 @@ export function PriceFairValueChart({
               {mk.text}
             </span>
           ))}
+          {marcasVela.map((p) => {
+            const b = price[p.i];
+            const alc = p.tipo === "alcista";
+            return (
+              <span
+                key={`pv${p.t}`}
+                title={`${p.nombre} · ${fmtDay(p.t)}${p.volumen ? " · con volumen alto" : ""}\n${PATRONES[p.nombre]}`}
+                className="absolute -translate-x-1/2 text-[0.6rem] font-bold leading-none pointer-events-auto cursor-help"
+                style={{ left: `${(pricePts[p.i].x / W) * 100}%`, top: `calc(${(Y(alc ? (b.l ?? b.c) : (b.h ?? b.c)) / H) * 100}% ${alc ? "+ 3px" : "- 13px"})`, color: alc ? "var(--sig-strong)" : "var(--sig-avoid)" }}
+              >
+                {alc ? "▲" : "▼"}
+              </span>
+            );
+          })}
           {earn.map((t) => (
             <span
               key={`le${t}`}
@@ -489,9 +547,17 @@ export function PriceFairValueChart({
       </div>
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs mt-2">
-        <span className="inline-flex items-center gap-1.5">
-          <span className="w-4 h-0.5 bg-ink rounded" /> Precio
-        </span>
+        <button type="button" aria-pressed={velas} onClick={() => setVelas(!velas)} className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border border-ink text-[0.7rem] font-bold" title="Cambiar entre velas japonesas y línea">
+          {velas ? (
+            <>
+              <span className="inline-flex gap-0.5"><span className="w-1 h-3 rounded-sm" style={{ background: "var(--sig-strong)" }} /><span className="w-1 h-3 rounded-sm mt-0.5" style={{ background: "var(--sig-avoid)" }} /></span> Velas
+            </>
+          ) : (
+            <>
+              <span className="w-4 h-0.5 bg-ink rounded" /> Línea
+            </>
+          )}
+        </button>
         <span className="inline-flex items-center gap-1.5">
           <span className="w-4 h-0.5 rounded" style={{ background: "var(--olive-deep)" }} /> Fair Value {fv && isNum(fv.fairValueNow) ? fmtMoney(fv.fairValueNow) : ""}
         </span>
@@ -520,6 +586,7 @@ export function PriceFairValueChart({
             <span className="text-olive-deep">fondos</span>
           </button>
         )}
+        {marcasVela.length > 0 && <span className="text-ink-soft"><b className="text-sig-strong">▲</b>/<b className="text-sig-avoid">▼</b> = patrón de velas</span>}
         {earn.length > 0 && <span className="text-ink-soft">R = resultados</span>}
         {divs.length > 0 && <span className="text-ink-soft">D = dividendo</span>}
       </div>

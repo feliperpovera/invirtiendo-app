@@ -39,8 +39,8 @@ function agrupar(daily: PricePoint[], meses: number): Mes[] {
         pts,
         open,
         close,
-        min: Math.min(...cierres),
-        max: Math.max(...cierres),
+        min: Math.min(...pts.map((x) => x.l ?? x.c)),
+        max: Math.max(...pts.map((x) => x.h ?? x.c)),
         changePct: open > 0 ? ((close - open) / open) * 100 : 0,
       };
     })
@@ -70,6 +70,9 @@ export function MonthlyStrip({ daily, meses = 5, height = 40 }: { daily: PricePo
           })
           .join(" ");
         const actual = i === data.length - 1;
+        const velas = m.pts.every((p) => p.o != null);
+        const Y = (v: number) => height - ((v - m.min) / rango) * height;
+        const paso = W / m.pts.length;
         return (
           <div
             key={m.key}
@@ -83,8 +86,24 @@ export function MonthlyStrip({ daily, meses = 5, height = 40 }: { daily: PricePo
               </span>
             </div>
             <svg viewBox={`0 0 ${W} ${height}`} preserveAspectRatio="none" className="block w-full mt-0.5" style={{ height }} aria-hidden>
-              <path d={`${d} L${W},${height} L0,${height} Z`} fill={color} opacity="0.12" />
-              <path d={d} fill="none" stroke={color} strokeWidth="1.5" vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
+              {velas ? (
+                m.pts.map((p, j) => {
+                  const c = p.c >= p.o! ? "var(--sig-strong)" : "var(--sig-avoid)";
+                  const x = paso * (j + 0.5);
+                  const top = Y(Math.max(p.o!, p.c));
+                  return (
+                    <g key={p.t}>
+                      <line x1={x} x2={x} y1={Y(p.h!)} y2={Y(p.l!)} stroke={c} strokeWidth="1" vectorEffect="non-scaling-stroke" />
+                      <rect x={x - paso * 0.32} width={paso * 0.64} y={top} height={Math.max(0.6, Y(Math.min(p.o!, p.c)) - top)} fill={c} />
+                    </g>
+                  );
+                })
+              ) : (
+                <>
+                  <path d={`${d} L${W},${height} L0,${height} Z`} fill={color} opacity="0.12" />
+                  <path d={d} fill="none" stroke={color} strokeWidth="1.5" vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
+                </>
+              )}
             </svg>
             <div className="flex justify-between text-[0.6rem] text-ink-soft num">
               <span>{fmtMoney(m.min, 0)}</span>

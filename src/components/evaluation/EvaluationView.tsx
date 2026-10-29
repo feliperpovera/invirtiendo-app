@@ -10,6 +10,7 @@ import { fmtMoney, fmtBig, fmtPct, fmtX, isNum } from "@/lib/format";
 import { Card, Eyebrow, SignalPill, Delta, Stat } from "@/components/ui";
 import { ScoreRing, PillarBar, BuyZoneGauge, RangeBar } from "@/components/charts";
 import { PriceFairValueChart } from "@/components/PriceFairValueChart";
+import { TermometroTecnico } from "./TermometroTecnico";
 import { MonthlyStrip } from "@/components/MonthlyStrip";
 import { TimeAgo } from "@/components/ClientTime";
 import { Checklist } from "./Checklist";
@@ -155,6 +156,8 @@ export function EvaluationView({ ev }: { ev: Evaluation }) {
         </div>
         <PriceFairValueChart history={ev.history} fv={ev.fvHistory} current={q.price} asOf={ev.asOf} height={320} />
       </Card>
+
+      <TermometroTecnico daily={ev.history.daily} />
 
       <ValuationPanel v={ev.valuation} adjusted={adjusted} assump={assump} setAssump={setAssump} />
       <AnalistasCard v={ev.valuation} s={ev.sentiment} price={q.price} />

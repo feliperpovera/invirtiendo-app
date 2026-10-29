@@ -10,11 +10,12 @@ import { fmtMoney, fmtPct } from "@/lib/format";
 const RANGOS = ["1D", "1S", "1M", "3M", "6M", "YTD", "1A"] as const;
 type Serie = { base: number | null; points: PricePoint[] } | null;
 
-/** Mini gráfica de área con línea base punteada y marcas de nuestras compras/ventas dentro del periodo. */
+/** Mini gráfica de velas (o área si la fuente no trae apertura/máx/mín) con línea base punteada y marcas de nuestras compras/ventas. */
 function Mini({ s, ops }: { s: Serie; ops: Array<{ t: number; venta: boolean }> }) {
   if (!s || s.points.length < 2) return <div className="skeleton h-20 w-full" />;
   const W = 300, H = 80;
-  const ys = s.points.map((p) => p.c).concat(s.base ? [s.base] : []);
+  const velas = s.points.every((p) => p.o != null);
+  const ys = s.points.flatMap((p) => (velas ? [p.h!, p.l!] : [p.c])).concat(s.base ? [s.base] : []);
   const lo = Math.min(...ys), hi = Math.max(...ys);
   const t0 = s.points[0].t, t1 = s.points[s.points.length - 1].t;
   const X = (t: number) => ((t - t0) / (t1 - t0 || 1)) * W;
@@ -27,9 +28,21 @@ function Mini({ s, ops }: { s: Serie; ops: Array<{ t: number; venta: boolean }> 
   const cerca = (t: number) => s.points.reduce((a, p) => (Math.abs(p.t - t) < Math.abs(a.t - t) ? p : a));
   return (
     <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="block h-20 w-full" aria-hidden>
-      <path d={`${d}L${W},${H}L0,${H}Z`} fill={col} opacity="0.12" />
+      {!velas && <path d={`${d}L${W},${H}L0,${H}Z`} fill={col} opacity="0.12" />}
       {s.base && <line x1="0" x2={W} y1={Y(s.base)} y2={Y(s.base)} stroke="var(--ink-soft)" strokeDasharray="3 3" strokeWidth="1" vectorEffect="non-scaling-stroke" opacity="0.6" />}
-      <path d={d} fill="none" stroke={col} strokeWidth="2" vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
+      {velas
+        ? s.points.map((p) => {
+            const c = p.c >= p.o! ? "var(--sig-strong)" : "var(--sig-avoid)";
+            const bw = (W / s.points.length) * 0.65;
+            const top = Y(Math.max(p.o!, p.c));
+            return (
+              <g key={p.t}>
+                <line x1={X(p.t)} x2={X(p.t)} y1={Y(p.h!)} y2={Y(p.l!)} stroke={c} strokeWidth="1" vectorEffect="non-scaling-stroke" />
+                <rect x={X(p.t) - bw / 2} width={bw} y={top} height={Math.max(0.8, Y(Math.min(p.o!, p.c)) - top)} fill={c} />
+              </g>
+            );
+          })
+        : <path d={d} fill="none" stroke={col} strokeWidth="2" vectorEffect="non-scaling-stroke" strokeLinejoin="round" />}
       {enRango.map((o, i) => {
         const p = cerca(o.t);
         return <circle key={i} cx={X(p.t)} cy={Y(p.c)} r="4" fill={o.venta ? "var(--terracotta)" : "var(--olive-deep)"} stroke="var(--paper)" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />;

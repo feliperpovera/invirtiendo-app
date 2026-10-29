@@ -70,6 +70,11 @@ export interface Quote {
 export interface PricePoint {
   t: number; // ms
   c: number;
+  /** Apertura, máximo, mínimo y volumen de la barra (vela); faltan en fuentes que solo dan cierre. */
+  o?: number;
+  h?: number;
+  l?: number;
+  v?: number;
 }
 
 export interface PriceHistory {

@@ -143,7 +143,7 @@ interface YChart {
       };
       timestamp?: number[];
       events?: { dividends?: Record<string, { amount: number; date: number }>; splits?: Record<string, { date: number; numerator: number; denominator: number; splitRatio: string }> };
-      indicators: { quote: Array<{ close?: Array<number | null>; open?: Array<number | null> }> };
+      indicators: { quote: Array<{ close?: Array<number | null>; open?: Array<number | null>; high?: Array<number | null>; low?: Array<number | null>; volume?: Array<number | null> }> };
     }> | null;
     error: { code: string; description: string } | null;
   };
@@ -158,11 +158,14 @@ async function chart(symbol: string, range: string, interval: string) {
 
 function toPoints(r: Awaited<ReturnType<typeof chart>>): PricePoint[] {
   const ts = r.timestamp ?? [];
-  const closes = r.indicators.quote[0]?.close ?? [];
+  const q = r.indicators.quote[0] ?? {};
   const out: PricePoint[] = [];
   for (let i = 0; i < ts.length; i++) {
-    const c = closes[i];
-    if (isNum(c)) out.push({ t: ts[i] * 1000, c });
+    const c = q.close?.[i];
+    if (!isNum(c)) continue;
+    const [o, h, l, v] = [q.open?.[i], q.high?.[i], q.low?.[i], q.volume?.[i]];
+    // Vela completa solo si llegan apertura, máximo y mínimo; si no, queda el cierre (se dibuja como línea)
+    out.push(isNum(o) && isNum(h) && isNum(l) ? { t: ts[i] * 1000, c, o, h, l, ...(isNum(v) ? { v } : {}) } : { t: ts[i] * 1000, c });
   }
   return out;
 }
@@ -211,7 +214,7 @@ export async function yahooSerie(
   interval: string,
   ttlMs: number,
 ): Promise<{ points: PricePoint[]; prevClose: number | null; sesiones: number[] }> {
-  return cached(`yh:serie2:${symbol}:${range}:${interval}`, ttlMs, async () => {
+  return cached(`yh:serie3:${symbol}:${range}:${interval}`, ttlMs, async () => {
     const r = await chart(symbol, range, interval);
     return {
       points: toPoints(r),
@@ -224,7 +227,7 @@ export async function yahooSerie(
 }
 
 export async function yahooHistory(symbol: string): Promise<PriceHistory> {
-  return cached(`yh:hist2:${symbol}`, TTL.history, async () => {
+  return cached(`yh:hist3:${symbol}`, TTL.history, async () => {
     const [d, w, m] = await Promise.all([chart(symbol, "2y", "1d"), chart(symbol, "5y", "1wk"), chart(symbol, "10y", "1mo")]);
     const dividends = Object.values(m.events?.dividends ?? {})
       .map((x) => ({ t: x.date * 1000, amount: x.amount }))
