@@ -64,6 +64,7 @@ export function PriceFairValueChart({
       .catch(() => setPoder([]));
   }, [history.symbol]);
   const [showEma, setShowEma] = useState(true);
+  const [showEma100, setShowEma100] = useState(true);
   const [velas, setVelas] = useState(true);
   const W = 1000;
   const H = height;
@@ -77,15 +78,16 @@ export function PriceFairValueChart({
     const all = pick.length ? pick : history.daily;
     const diario = all === history.daily;
     // Indicadores sobre toda la serie (así arrancan llenos en el borde izquierdo) y luego se recorta al rango.
-    // EMA de 200 días equivalente: 40 semanas o 10 meses según la frecuencia de la serie.
+    // EMA de 200 y 100 días equivalentes: 40/20 semanas o 10/5 meses según la frecuencia de la serie.
     const closes = all.map((p) => p.c);
     const e200 = ema(closes, diario ? 200 : all === history.weekly ? 40 : 10);
+    const e100 = ema(closes, diario ? 100 : all === history.weekly ? 20 : 5);
     const pats = diario ? detectarPatrones(all).filter((p) => p.tipo !== "neutral") : [];
     const bb = bollinger(closes);
     const first = all.findIndex((p) => p.t >= from);
     const price = first < 0 ? [] : all.slice(first);
     if (price.length < 5) return null;
-    const ind = { e200: e200.slice(first), bb: bb.slice(first) };
+    const ind = { e200: e200.slice(first), e100: e100.slice(first), bb: bb.slice(first) };
     const patrones = pats.filter((p) => p.i >= first).map((p) => ({ ...p, i: p.i - first }));
 
     const t0 = price[0].t;
@@ -99,7 +101,7 @@ export function PriceFairValueChart({
     // Con velas el eje sigue al precio: en rangos cortos (≤6M) solo precio y EMA; en los largos sin la banda.
     // Lo que queda fuera se recorta y su etiqueta se pega al borde.
     const soloPrecio = velas && years <= 0.5;
-    if (soloPrecio) for (const v of ind.e200) ys.push(v);
+    if (soloPrecio) ys.push(...ind.e200, ...ind.e100);
     else for (const p of fvPts) ys.push(...(velas ? [p.fv] : [p.lo, p.hi]));
     if (fv && !soloPrecio) {
       if (isNum(fv.fairValueNow)) ys.push(fv.fairValueNow);
@@ -417,6 +419,7 @@ export function PriceFairValueChart({
               <path d={seriePath(ind.e200)} fill="none" stroke="var(--terracotta)" strokeWidth="2.5" vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
             </>
           )}
+          {showEma100 && <path d={seriePath(ind.e100)} fill="none" stroke="var(--sig-watch)" strokeWidth="2.5" vectorEffect="non-scaling-stroke" strokeLinejoin="round" />}
           {franjas.map((f) => (
             <rect key={`fr${f.quien}`} x={X(f.t0)} width={Math.max(2, X(f.t1) - X(f.t0))} y={Y(f.hi)} height={Math.max(2, Y(f.lo) - Y(f.hi))} fill="var(--olive)" opacity="0.14" />
           ))}
@@ -578,6 +581,9 @@ export function PriceFairValueChart({
         )}
         <button type="button" aria-pressed={showEma} onClick={() => setShowEma(!showEma)} className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[0.7rem] font-bold ${showEma ? "border-ink" : "border-line text-ink-soft"}`}>
           <span className="w-4 h-0.5 rounded" style={{ background: "var(--terracotta)" }} />EMA 200
+        </button>
+        <button type="button" aria-pressed={showEma100} onClick={() => setShowEma100(!showEma100)} className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[0.7rem] font-bold ${showEma100 ? "border-ink" : "border-line text-ink-soft"}`}>
+          <span className="w-4 h-0.5 rounded" style={{ background: "var(--sig-watch)" }} />EMA 100
         </button>
         {poder.length > 0 && (
           <button type="button" aria-pressed={showPoder} onClick={() => setShowPoder(!showPoder)} className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[0.7rem] font-bold ${showPoder ? "border-ink" : "border-line text-ink-soft"}`}>

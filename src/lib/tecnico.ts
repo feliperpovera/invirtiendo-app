@@ -1,4 +1,5 @@
 import type { PricePoint } from "@/lib/analysis/types";
+import { ema } from "./indicadores";
 
 /* ── Velas japonesas ─────────────────────────────────────────────── */
 
@@ -81,7 +82,7 @@ export const ZONAS = [
 
 /**
  * Termómetro 0–100 del momento de compra con la serie diaria (~2 años). Pesos según la evidencia:
- * momentum 12-1 (Jegadeesh-Titman), cercanía al máximo de 52 semanas (George-Hwang), tendencia vs SMA 200 (Faber),
+ * momentum 12-1 (Jegadeesh-Titman), cercanía al máximo de 52 semanas (George-Hwang), tendencia vs SMA 200 (Faber) y EMA 100,
  * liquidez y presión de volumen, volatilidad (Barroso-Santa-Clara) y velas recientes (evidencia débil: peso bajo).
  */
 export function termometro(d: PricePoint[]): Termometro {
@@ -109,8 +110,16 @@ export function termometro(d: PricePoint[]): Termometro {
     const subiendo = s > s20;
     let sc = clamp01((dist + 0.1) / 0.2) * 0.7 + (subiendo ? 0.3 : 0);
     if (dist > 0.3) sc = Math.min(sc, 0.6);
-    comp.push({ clave: "sma", nombre: "Tendencia vs SMA 200", peso: 20, score: sc, valor: pct(dist, 1), lectura: dist > 0.3 ? "Muy estirada sobre la media: mejor esperar un retroceso" : `${dist >= 0 ? "Sobre" : "Bajo"} la media, que va ${subiendo ? "subiendo" : "bajando"}` });
-  } else comp.push({ clave: "sma", nombre: "Tendencia vs SMA 200", peso: 20, score: null, valor: "—", lectura: "Falta historia" });
+    comp.push({ clave: "sma", nombre: "Tendencia vs SMA 200", peso: 15, score: sc, valor: pct(dist, 1), lectura: dist > 0.3 ? "Muy estirada sobre la media: mejor esperar un retroceso" : `${dist >= 0 ? "Sobre" : "Bajo"} la media, que va ${subiendo ? "subiendo" : "bajando"}` });
+  } else comp.push({ clave: "sma", nombre: "Tendencia vs SMA 200", peso: 15, score: null, valor: "—", lectura: "Falta historia" });
+
+  // 3b. Tendencia de mediano plazo: precio vs EMA 100 y su pendiente (10 sesiones)
+  if (n >= 120) {
+    const e = ema(c, 100);
+    const dist = P / e[n - 1] - 1;
+    const subiendo = e[n - 1] > e[n - 11];
+    comp.push({ clave: "ema100", nombre: "Tendencia vs EMA 100", peso: 10, score: clamp01((dist + 0.08) / 0.16) * 0.7 + (subiendo ? 0.3 : 0), valor: pct(dist, 1), lectura: `${dist >= 0 ? "Sobre" : "Bajo"} la media, que va ${subiendo ? "subiendo" : "bajando"}` });
+  } else comp.push({ clave: "ema100", nombre: "Tendencia vs EMA 100", peso: 10, score: null, valor: "—", lectura: "Falta historia" });
 
   // 4. Liquidez y volumen: dinero negociado al día (20 sesiones) y volumen en días verdes vs rojos (50 sesiones)
   const conVol = d.slice(-50).filter((p) => p.v);
@@ -143,7 +152,7 @@ export function termometro(d: PricePoint[]): Termometro {
   const recientes = patrones.filter((p) => p.i >= n - 5 && p.tipo !== "neutral");
   let scVela = 0.5;
   for (const p of recientes) scVela += (p.tipo === "alcista" ? 1 : -1) * (p.volumen ? 0.35 : 0.2);
-  comp.push({ clave: "velas", nombre: "Velas recientes (5 sesiones)", peso: 10, score: tieneVela(d[n - 1]) ? clamp01(scVela) : null, valor: recientes.length ? recientes.map((p) => p.nombre).join(", ") : "Sin patrón", lectura: recientes.length ? (scVela > 0.5 ? "Giro o empuje al alza" : scVela < 0.5 ? "Señal de debilidad" : "Señales cruzadas") : "Nada relevante" });
+  comp.push({ clave: "velas", nombre: "Velas recientes (5 sesiones)", peso: 5, score: tieneVela(d[n - 1]) ? clamp01(scVela) : null, valor: recientes.length ? recientes.map((p) => p.nombre).join(", ") : "Sin patrón", lectura: recientes.length ? (scVela > 0.5 ? "Giro o empuje al alza" : scVela < 0.5 ? "Señal de debilidad" : "Señales cruzadas") : "Nada relevante" });
 
   const validos = comp.filter((x) => x.score != null);
   const pesoTotal = validos.reduce((s, x) => s + x.peso, 0);

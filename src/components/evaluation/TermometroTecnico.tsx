@@ -83,7 +83,7 @@ export function TermometroTecnico({ daily }: { daily: PricePoint[] }) {
           <p className="mt-1 text-xs text-ink-soft">Sin patrones relevantes en las últimas 8 semanas.</p>
         )}
         <p className="mt-2 text-[0.7rem] text-ink-soft">
-          Las velas solas tienen evidencia débil (pesan 10%): valen más cuando confirman la tendencia, aparecen junto a la SMA 200 o el máximo de 52 semanas y vienen con volumen alto. Momentum, máximo 52 semanas y SMA 200 son los de mayor respaldo académico. Educativo, no asesoría.
+          Las velas solas tienen evidencia débil (pesan 5%): valen más cuando confirman la tendencia, aparecen junto a la SMA 200 o el máximo de 52 semanas y vienen con volumen alto. Momentum, máximo 52 semanas y SMA 200 son los de mayor respaldo académico. Educativo, no asesoría.
         </p>
       </div>
     </Card>
