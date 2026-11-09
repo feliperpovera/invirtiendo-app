@@ -3,7 +3,6 @@ import { Fraunces, Figtree } from "next/font/google";
 import "./globals.css";
 import { Nav } from "@/components/Nav";
 import { TickerTape } from "@/components/TickerTape";
-import { Analytics } from "@vercel/analytics/next";
 
 const fraunces = Fraunces({
   subsets: ["latin"],
@@ -32,6 +31,14 @@ export const viewport: Viewport = { themeColor: "#22211d", width: "device-width"
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="es" className={`${fraunces.variable} ${figtree.variable} h-full`}>
+      <head>
+        {/* Cloudflare gratis a veces responde 500 al arrancar en frío: reintenta las lecturas de /api/ (GET) hasta 2 veces */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(()=>{const f=window.fetch.bind(window);window.fetch=async(i,o)=>{const u=typeof i==="string"?i:i instanceof URL?i.href:i.url;const get=!o||!o.method||o.method==="GET";if(!get||!/\\/api\\//.test(u))return f(i,o);for(let n=0;;n++){try{const r=await f(i,o);if(r.status<500||n>=2)return r}catch(e){if(n>=2)throw e}await new Promise(s=>setTimeout(s,600*(n+1)))}}})();`,
+          }}
+        />
+      </head>
       <body className="min-h-full flex flex-col">
         <Nav />
         <TickerTape />
@@ -63,8 +70,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <p>Fair Values estimados con supuestos declarados. Precios con retraso de hasta 15 min. <a href="/fuentes" className="underline">Fuentes de datos</a></p>
           </div>
         </footer>
-        {/* Visitas por día, páginas, países y de dónde llegan: panel Analytics del proyecto en Vercel */}
-        <Analytics />
       </body>
     </html>
   );

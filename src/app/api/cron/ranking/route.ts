@@ -3,7 +3,7 @@ import { evaluate } from "@/lib/evaluate";
 import { guardarRanking, rankingPendientes } from "@/lib/providers/ranking";
 
 /**
- * Job diario del ranking (vercel.json → crons). Reevalúa cada acción del universo con el
+ * Job diario del ranking (.github/workflows/tareas.yml). Reevalúa cada acción del universo con el
  * precio y el Fair Value del día y deja el resultado en la tabla `ranking`.
  *
  * Cada acción tarda ~10-20 s (Yahoo, SEC y cuatro plataformas), así que un solo turno no
@@ -38,8 +38,14 @@ export async function GET(req: NextRequest) {
     Number.isFinite(desdeParam) && desdeParam > 0
       ? desdeParam
       : inicio - (Number.isFinite(horasParam) && horasParam >= 0 ? horasParam : VENCE_HORAS) * 3600_000;
-  const cola = await rankingPendientes((Date.now() - desde) / 3600_000, omitir);
-  const pendientes = cola.length;
+  // `lote=N`: evalúa como mucho N acciones en esta llamada (Cloudflare gratis: 50 llamadas externas por invocación)
+  const lote = Number(req.nextUrl.searchParams.get("lote")) || Infinity;
+  // `parte=k/n`: solo las acciones cuyo ticker cae en el carril k de n (hash estable), para correr n carriles en paralelo sin repetir
+  const [k, n] = (req.nextUrl.searchParams.get("parte") ?? "0/1").split("/").map(Number);
+  const carril = (t: string) => [...t].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7) % (n || 1);
+  const todas = (await rankingPendientes((Date.now() - desde) / 3600_000, omitir)).filter((t) => carril(t) === (k || 0));
+  const pendientes = todas.length;
+  const cola = lote === Infinity ? todas : todas.slice(0, lote);
   const ok: string[] = [];
   const fallidas: string[] = [];
 
@@ -56,8 +62,9 @@ export async function GET(req: NextRequest) {
   };
   await Promise.all(Array.from({ length: CONCURRENCIA }, obrero));
 
-  const restantes = cola.length;
-  if (restantes > 0 && salto < MAX_SALTOS) {
+  const restantes = lote === Infinity ? cola.length : pendientes - ok.length - fallidas.length;
+  // Con `lote` encadena quien llama (GitHub Actions): un worker de Cloudflare no puede llamarse a sí mismo por URL
+  if (restantes > 0 && salto < MAX_SALTOS && lote === Infinity) {
     const base = process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : req.nextUrl.origin;
     const url = new URL("/api/cron/ranking", base);
     url.searchParams.set("salto", String(salto + 1));
@@ -69,7 +76,7 @@ export async function GET(req: NextRequest) {
   }
 
   return Response.json(
-    { salto, pendientes, evaluadas: ok.length, fallidas, restantes, segundos: Math.round((Date.now() - inicio) / 1000) },
+    { salto, pendientes, evaluadas: ok.length, fallidas, restantes, desde, omitir: [...omitir, ...fallidas], segundos: Math.round((Date.now() - inicio) / 1000) },
     { headers: { "Cache-Control": "no-store" } },
   );
 }
