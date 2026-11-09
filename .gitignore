@@ -43,3 +43,7 @@ next-env.d.ts
 # invirtiendo
 .cache/
 .env.local
+.open-next
+.dev.vars
+.wrangler
+deploy.sh
