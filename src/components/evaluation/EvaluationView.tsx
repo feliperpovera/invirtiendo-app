@@ -21,7 +21,6 @@ import { AnalistasCard } from "./Analistas";
 import { PlanPanel } from "./PlanPanel";
 import { TickerLogo } from "@/components/TickerLogo";
 import { Consenso } from "./Consenso";
-import { RadarAccion } from "./RadarAccion";
 import { FranjaRendimiento } from "./FranjaRendimiento";
 
 const VERDICT_ES: Record<string, string> = { BUY: "Comprar por tramos", WATCHLIST: "Watchlist: esperar precio", REVIEW: "Faltan datos en algún pilar", DISCARD: "No cumple los pilares" };
@@ -161,7 +160,6 @@ export function EvaluationView({ ev }: { ev: Evaluation }) {
 
       <ValuationPanel v={ev.valuation} adjusted={adjusted} assump={assump} setAssump={setAssump} />
       <AnalistasCard v={ev.valuation} s={ev.sentiment} price={q.price} />
-      <RadarAccion symbol={ev.symbol} daily={ev.history.daily} price={q.price} />
       <Checklist filters={buffett.filters} />
       <Financials ev={ev} />
       {ev.consenso && <Consenso filas={ev.consenso} moneda={ev.profile.statementCurrency && ev.profile.statementCurrency !== "USD" ? ev.profile.statementCurrency : "USD"} />}

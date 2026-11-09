@@ -1,44 +1,28 @@
-# Tareas programadas de la web (Cloudflare gratis no permite trabajos largos en un solo llamado).
-# Cada curl es una invocación nueva del worker, con su propio cupo de llamadas externas.
+# Tareas programadas: el ranking diario se calcula aquí, en Node, y se guarda en Supabase.
+# No va en el worker porque el plan gratis de Cloudflare corta cada petición a los 10 ms de CPU.
 name: Tareas programadas
 on:
   schedule:
-    - cron: "0 22 * * *"   # ranking diario
-    - cron: "0 13 * * 1"   # radar del poder, lunes
+    - cron: "0 22 * * *"   # ranking diario, 5 pm Colombia
   workflow_dispatch:
-    inputs:
-      tarea:
-        description: "ranking o radar"
-        default: "ranking"
-env:
-  BASE: https://invirtiendoo.feliperesvera106.workers.dev
-  AUTH: "authorization: Bearer ${{ secrets.CRON_SECRET }}"
 jobs:
   ranking:
-    if: github.event.schedule == '0 22 * * *' || inputs.tarea == 'ranking'
     runs-on: ubuntu-latest
-    timeout-minutes: 340
-    strategy:
-      fail-fast: false
-      matrix:
-        parte: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    timeout-minutes: 330
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+      FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+      ALPHAVANTAGE_API_KEY: ${{ secrets.ALPHAVANTAGE_API_KEY }}
+      MARKETAUX_API_KEY: ${{ secrets.MARKETAUX_API_KEY }}
+      POLYGON_API_KEY: ${{ secrets.POLYGON_API_KEY }}
+      SEC_USER_AGENT: ${{ secrets.SEC_USER_AGENT }}
+      MARKET_TZ: ${{ secrets.MARKET_TZ }}
     steps:
-      - name: Evaluar su parte del universo, de a 2 acciones por llamada
-        run: |
-          desde=$(( $(date +%s) * 1000 - 20 * 3600 * 1000 )); omitir=""
-          for i in $(seq 1 200); do
-            r=$(curl -s -m 280 -H "$AUTH" "$BASE/api/cron/ranking?lote=2&parte=${{ matrix.parte }}/10&desde=$desde&omitir=$omitir") || { sleep 5; continue; }
-            echo "$r" | jq -e . >/dev/null 2>&1 || { echo "$i error: ${r:0:80}"; sleep 5; continue; }
-            echo "$i $(echo "$r" | jq -c '{evaluadas, restantes, fallidas}')"
-            [ "$(echo "$r" | jq -r '.restantes // 0')" = "0" ] && break
-            omitir=$(echo "$r" | jq -r '.omitir // [] | join(",")')
-          done
-  radar:
-    if: github.event.schedule == '0 13 * * 1' || inputs.tarea == 'radar'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Una persona por llamada
-        run: |
-          for p in pelosi trump thiel berkshire ackman druckenmiller dalio wood tepper soros; do
-            echo "$p: $(curl -s -m 280 -H "$AUTH" "$BASE/api/cron/radar?persona=$p")"
-          done
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: node --import ./scripts/alias.mjs scripts/ranking.mjs

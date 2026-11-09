@@ -5,7 +5,7 @@ import { UNIVERSO, pendientes } from "@/lib/universo";
  * Ranking por calificación. Cada evaluación deja su resultado en la tabla `ranking` de
  * Supabase; el top se lee de ahí. No hay datos personales: leerla es público y escribir
  * pasa por una función que solo acepta una fila por ticker.
- * Un job diario (`/api/cron/ranking`) reevalúa todo el universo con precio y Fair Value del día.
+ * Un job diario (scripts/ranking.mjs en GitHub Actions) reevalúa todo el universo con precio y Fair Value del día.
  */
 const cfg = () => ({ url: process.env.SUPABASE_URL, key: process.env.SUPABASE_KEY });
 

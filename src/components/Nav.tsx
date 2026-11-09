@@ -69,7 +69,6 @@ const links = [
   { href: "/portafolio", label: "Portafolio" },
   { href: "/watchlist", label: "Watchlist" },
   { href: "/simulador", label: "Simulador" },
-  { href: "/radar", label: "Radar del Poder" },
 ];
 
 export function Nav() {

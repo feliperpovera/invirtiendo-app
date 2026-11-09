@@ -10,6 +10,7 @@ import crypto from "node:crypto";
 
 type Entry<T> = { v: T; exp: number };
 
+const WORKERS = typeof navigator !== "undefined" && navigator.userAgent === "Cloudflare-Workers";
 const mem = new Map<string, Entry<unknown>>();
 const inflight = new Map<string, Promise<unknown>>();
 const DISK_DIR = path.join(process.cwd(), ".cache");
@@ -65,7 +66,9 @@ export async function cacheSet<T>(key: string, v: T, ttlMs: number): Promise<voi
 export async function cached<T>(key: string, ttlMs: number, fn: () => Promise<T>): Promise<T> {
   const hit = await cacheGet<T>(key);
   if (hit !== undefined) return hit;
-  const running = inflight.get(key) as Promise<T> | undefined;
+  // En Cloudflare Workers una promesa no puede esperarse desde otra petición (el runtime la da por colgada):
+  // allí la deduplicación es solo dentro de la misma petición, vía caché en memoria al terminar.
+  const running = WORKERS ? undefined : (inflight.get(key) as Promise<T> | undefined);
   if (running) return running;
   const p = (async () => {
     try {
@@ -80,7 +83,7 @@ export async function cached<T>(key: string, ttlMs: number, fn: () => Promise<T>
       inflight.delete(key);
     }
   })();
-  inflight.set(key, p);
+  if (!WORKERS) inflight.set(key, p);
   return p;
 }
 
