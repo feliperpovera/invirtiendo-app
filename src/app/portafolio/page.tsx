@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { leerPosiciones, leerMovimientos, leerResumen, type MovimientoPublico } from "@/lib/providers/portafolioPublico";
 import { leerRanking } from "@/lib/providers/ranking";
+import { nivelesIbkr } from "@/lib/providers/portafolioIbkr";
 import { PortafolioVsSP } from "@/components/PortafolioVsSP";
 import { PortafolioEnVivo, RendimientoCuenta } from "@/components/PortafolioVivo";
 import { PosicionesGraficas } from "@/components/PosicionesGraficas";
@@ -34,7 +35,19 @@ export default async function PortafolioPage({ searchParams }: { searchParams: P
   const pedida = (await searchParams).cuenta;
   const cuenta = CUENTAS.some((c) => c.id === pedida) ? pedida! : "principal";
   const principal = cuenta === "principal";
-  const [pos, mov, res, rk] = await Promise.all([leerPosiciones(cuenta), leerMovimientos(cuenta), principal ? leerResumen() : Promise.resolve(null), leerRanking(200)]);
+  const [pos, mov, res, rk, niveles] = await Promise.all([leerPosiciones(cuenta), leerMovimientos(cuenta), principal ? leerResumen() : Promise.resolve(null), leerRanking(200), principal ? nivelesIbkr().catch(() => []) : Promise.resolve([])]);
+  // Rentabilidad por año calendario: % ponderado por tiempo de IBKR (último nivel del año / último del año anterior)
+  // y en dinero lo ganado vendiendo ese año; el año en curso suma además lo que va ganando lo que todavía se tiene.
+  const noRealizado = pos.reduce((a, p) => a + (p.pnl ?? 0), 0);
+  const anios = [...new Set([...niveles.map((n) => new Date(n.t).getUTCFullYear()), ...mov.map((m) => Number(m.fecha.slice(0, 4)))])].sort((a, b) => b - a);
+  const anioActual = anios[0];
+  const porAnio = anios.map((y) => {
+    const ult = (yy: number) => niveles.filter((n) => new Date(n.t).getUTCFullYear() === yy).at(-1)?.c;
+    const base = ult(y - 1) ?? niveles.find((n) => new Date(n.t).getUTCFullYear() === y)?.c;
+    const fin = ult(y);
+    const vendido = mov.filter((m) => m.fecha.startsWith(String(y))).reduce((a, m) => a + (m.pnl_realizado ?? 0), 0);
+    return { y, pct: base && fin ? (fin / base - 1) * 100 : null, vendido, total: vendido + (y === anioActual ? noRealizado : 0) };
+  });
   const senal = new Map(rk.map((r) => [r.ticker, r]));
   const act = res?.actualizado ?? pos[0]?.actualizado;
   const realizado = mov.reduce((a, m) => a + (m.pnl_realizado ?? 0), 0);
@@ -71,6 +84,30 @@ export default async function PortafolioPage({ searchParams }: { searchParams: P
 
 
       <PortafolioEnVivo pos={pos} efectivo={res?.efectivo ?? null} realizado={realizado} ventas={ventas} senales={Object.fromEntries(pos.map((p) => [p.ticker, senal.get(p.ticker)?.senal_key ? { key: senal.get(p.ticker)!.senal_key!, label: senal.get(p.ticker)!.senal ?? "" } : undefined]))} />
+
+      {porAnio.length > 0 && (
+        <section className="space-y-2">
+          <Eyebrow>Rentabilidad por año</Eyebrow>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {porAnio.map((a) => (
+              <Card key={a.y} className="p-4">
+                <p className="font-display text-2xl">{a.y}{a.y === anioActual && <span className="text-xs font-sans text-ink-soft ml-2">en curso</span>}</p>
+                {a.pct != null && (
+                  <p className="num font-display text-3xl leading-tight" style={{ color: a.pct >= 0 ? "var(--sig-strong)" : "var(--sig-avoid)" }}>{fmtPct(a.pct, 2, true)}</p>
+                )}
+                <p className="num text-sm mt-1">
+                  Ganancia: <b style={{ color: a.total >= 0 ? "var(--sig-strong)" : "var(--sig-avoid)" }}>{a.total >= 0 ? "+" : "−"}{fmtMoney(Math.abs(a.total))}</b>
+                </p>
+                <p className="num text-xs text-ink-soft">
+                  En ventas del año {a.vendido >= 0 ? "+" : "−"}{fmtMoney(Math.abs(a.vendido))}
+                  {a.y === anioActual && <> · en lo que tenemos {noRealizado >= 0 ? "+" : "−"}{fmtMoney(Math.abs(noRealizado))}</>}
+                </p>
+              </Card>
+            ))}
+          </div>
+          <p className="text-xs text-ink-soft">% = rentabilidad ponderada por tiempo de IBKR (los aportes no cuentan como ganancia). Ganancia en dólares = ventas cerradas en el año más, en el año en curso, lo que van ganando las posiciones abiertas.</p>
+        </section>
+      )}
 
       {principal && (
         <section className="space-y-2">
