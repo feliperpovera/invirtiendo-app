@@ -12,7 +12,7 @@ const RANGO: Record<string, [string, string, number]> = {
   "3M": ["3mo", "1d", 15 * 60_000],
   "6M": ["6mo", "1d", 15 * 60_000],
   YTD: ["ytd", "1d", 15 * 60_000],
-  "1A": ["1y", "1d", 15 * 60_000],
+  "1A": ["1y", "1wk", 15 * 60_000],
 };
 
 export async function GET(req: NextRequest) {
