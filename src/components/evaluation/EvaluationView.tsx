@@ -168,12 +168,12 @@ export function EvaluationView({ ev }: { ev: Evaluation }) {
       <NewsCard s={ev.sentiment} wsb={ev.complementos?.wsb} />
       <PlanPanel ev={ev} adjusted={adjusted} signal={signal} buffettPassed={buffett.passed} />
 
-      {/* Llamado fijo en móvil (como el "Get started" de TradingView): lleva al plan y a la watchlist */}
+      {/* Llamado fijo en móvil (como el "Get started" de TradingView): lleva al plan de compra */}
       <a href="#plan" className="md:hidden fixed bottom-3 inset-x-3 z-30 flex items-center justify-between gap-3 rounded-2xl bg-ink text-cream px-4 py-3 shadow-xl">
         <span className="text-sm">
           <b>{ev.symbol}</b> · {signal.label} · margen {fmtPct(adjusted.mos, 0, true)}
         </span>
-        <span className="rounded-full bg-terracotta px-3 py-1.5 text-xs font-bold">Seguir gratis</span>
+        <span className="rounded-full bg-terracotta px-3 py-1.5 text-xs font-bold">Ver plan</span>
       </a>
 
       <p className="text-xs text-ink-soft border-t border-line pt-3">

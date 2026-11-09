@@ -10,7 +10,8 @@ import crypto from "node:crypto";
 
 type Entry<T> = { v: T; exp: number };
 
-const WORKERS = typeof navigator !== "undefined" && navigator.userAgent === "Cloudflare-Workers";
+/** En Cloudflare Workers una promesa de una petición no puede esperarse desde otra: nada de colas ni promesas compartidas. */
+export const WORKERS = (typeof navigator !== "undefined" && navigator.userAgent === "Cloudflare-Workers") || "WebSocketPair" in globalThis;
 const mem = new Map<string, Entry<unknown>>();
 const inflight = new Map<string, Promise<unknown>>();
 const DISK_DIR = path.join(process.cwd(), ".cache");

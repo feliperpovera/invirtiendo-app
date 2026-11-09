@@ -5,7 +5,6 @@ import { leerRanking } from "@/lib/providers/ranking";
 import { PortafolioVsSP } from "@/components/PortafolioVsSP";
 import { PortafolioEnVivo, RendimientoCuenta } from "@/components/PortafolioVivo";
 import { PosicionesGraficas } from "@/components/PosicionesGraficas";
-import { TermometroIndices } from "@/components/TermometroIndices";
 import { TickerLogo } from "@/components/TickerLogo";
 import { Card, Eyebrow } from "@/components/ui";
 import { fmtMoney, fmtPct } from "@/lib/format";
@@ -70,7 +69,6 @@ export default async function PortafolioPage({ searchParams }: { searchParams: P
 
 
 
-      <TermometroIndices />
 
       <PortafolioEnVivo pos={pos} efectivo={res?.efectivo ?? null} realizado={realizado} ventas={ventas} senales={Object.fromEntries(pos.map((p) => [p.ticker, senal.get(p.ticker)?.senal_key ? { key: senal.get(p.ticker)!.senal_key!, label: senal.get(p.ticker)!.senal ?? "" } : undefined]))} />
 

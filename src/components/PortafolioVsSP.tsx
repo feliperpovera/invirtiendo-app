@@ -5,7 +5,6 @@ import { Card, Eyebrow } from "./ui";
 import { fmtPct, isNum } from "@/lib/format";
 import { RANGOS, type Rango } from "@/lib/analysis/portafolio";
 import { ema, bollinger } from "@/lib/indicadores";
-import { ValoracionSP } from "./ValoracionSP";
 
 interface Datos {
   rango: Rango;
@@ -426,10 +425,6 @@ export function PortafolioVsSP() {
                 {p.ticker} <span className="num font-medium text-ink-soft">{p.peso.toFixed(p.peso < 10 ? 1 : 0)}%</span>
               </span>
             ))}
-          </div>
-          {/* Valoración del mismo índice: dónde están las zonas de compra */}
-          <div className="mt-5 border-t border-line pt-4">
-            <ValoracionSP symbol={idx.symbol} nombre={idx.nombre} embebido />
           </div>
           <p className="mt-3 text-xs leading-relaxed text-ink-soft">
             Cuenta real de Invirtiendoo en Interactive Brokers, empezó en diciembre de 2025: en 1, 3 y 5 años el S&amp;P se ve completo y el portafolio arranca ese día, pegado a su línea. Rendimiento ponderado por tiempo (TWR): los aportes nuevos no cuentan como ganancia. Incluye dividendos; el S&amp;P 500 es el índice de precio, sin dividendos. &quot;Hoy&quot; es un estimado en vivo con los pesos del último cierre; los demás periodos son el dato oficial de IBKR. Rendimientos pasados no aseguran resultados futuros.

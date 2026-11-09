@@ -9,7 +9,7 @@
  * crumb), concurrencia limitada y reintentos con espera.
  */
 import { fetchJson, recordHealth, ProviderError } from "./http";
-import { cached, TTL } from "./cache";
+import { cached, TTL, WORKERS } from "./cache";
 import type { Quote, PriceHistory, PricePoint, Profile, RatioPoint, NewsItem, AnnualRow, QuarterRow, N } from "@/lib/analysis/types";
 import { isNum } from "@/lib/format";
 
@@ -25,7 +25,7 @@ let sessionPromise: Promise<Session> | null = null;
 
 async function getSession(force = false) {
   if (!force && session && Date.now() - session.at < 6 * 3600 * 1000) return session;
-  if (sessionPromise && !force) return sessionPromise;
+  if (sessionPromise && !force && !WORKERS) return sessionPromise;
   sessionPromise = (async () => {
     try {
       const r = await fetch("https://fc.yahoo.com", { headers: { "User-Agent": UA }, redirect: "manual", cache: "no-store" });
@@ -53,7 +53,7 @@ const queue: Array<() => void> = [];
 const MAX_CONCURRENT = 3;
 const acquire = () =>
   new Promise<void>((res) => {
-    if (active < MAX_CONCURRENT) {
+    if (WORKERS || active < MAX_CONCURRENT) {
       active++;
       res();
     } else queue.push(() => {

@@ -2,7 +2,6 @@ import type { Metadata, Viewport } from "next";
 import { Fraunces, Figtree } from "next/font/google";
 import "./globals.css";
 import { Nav } from "@/components/Nav";
-import { TickerTape } from "@/components/TickerTape";
 
 const fraunces = Fraunces({
   subsets: ["latin"],
@@ -41,7 +40,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className="min-h-full flex flex-col">
         <Nav />
-        <TickerTape />
         <main className="flex-1 w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pb-16">{children}</main>
         {/* Redes: el contenido nace en IG/TikTok, la página lleva de vuelta allá */}
         <section className="mt-12 bg-ink text-cream">
