@@ -278,3 +278,17 @@ function Torta({ filas, efectivo }: { filas: Array<{ ticker: string; valor: numb
     </section>
   );
 }
+
+/** % del año en curso con el mismo cálculo que "En el año" (TWR de IBKR + estimado en vivo desde su último cierre). */
+export function PctAnioVivo({ respaldo }: { respaldo: number | null }) {
+  const [v, setV] = useState<number | null>(null);
+  useEffect(() => {
+    fetch("/api/portafolio?rango=YTD")
+      .then((r) => r.json())
+      .then((j) => setV(j.retorno?.portafolio ?? null))
+      .catch(() => {});
+  }, []);
+  const x = v ?? respaldo;
+  if (x == null) return null;
+  return <p className="num font-display text-3xl leading-tight" style={{ color: x >= 0 ? "var(--sig-strong)" : "var(--sig-avoid)" }}>{fmtPct(x, 2, true)}</p>;
+}

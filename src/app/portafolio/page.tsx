@@ -4,7 +4,7 @@ import { leerPosiciones, leerMovimientos, leerResumen, type MovimientoPublico } 
 import { leerRanking } from "@/lib/providers/ranking";
 import { nivelesIbkr } from "@/lib/providers/portafolioIbkr";
 import { PortafolioVsSP } from "@/components/PortafolioVsSP";
-import { PortafolioEnVivo, RendimientoCuenta } from "@/components/PortafolioVivo";
+import { PortafolioEnVivo, RendimientoCuenta, PctAnioVivo } from "@/components/PortafolioVivo";
 import { PosicionesGraficas } from "@/components/PosicionesGraficas";
 import { TickerLogo } from "@/components/TickerLogo";
 import { Card, Eyebrow } from "@/components/ui";
@@ -92,7 +92,9 @@ export default async function PortafolioPage({ searchParams }: { searchParams: P
             {porAnio.map((a) => (
               <Card key={a.y} className="p-4">
                 <p className="font-display text-2xl">{a.y}{a.y === anioActual && <span className="text-xs font-sans text-ink-soft ml-2">en curso</span>}</p>
-                {a.pct != null && (
+                {a.y === anioActual ? (
+                  <PctAnioVivo respaldo={a.pct} />
+                ) : a.pct != null && (
                   <p className="num font-display text-3xl leading-tight" style={{ color: a.pct >= 0 ? "var(--sig-strong)" : "var(--sig-avoid)" }}>{fmtPct(a.pct, 2, true)}</p>
                 )}
                 <p className="num text-sm mt-1">
