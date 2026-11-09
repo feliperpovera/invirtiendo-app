@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { zona, type PuntoValoracion } from "@/lib/analysis/valoracionSP";
 
 const INDICES = [
-  { symbol: "^GSPC", nombre: "S&P 500" },
+  { symbol: "CNN", nombre: "S&P 500 · CNN" },
   { symbol: "^NDX", nombre: "Nasdaq-100" },
   { symbol: "^RUT", nombre: "Russell 2000" },
   { symbol: "^DJI", nombre: "Dow Jones" },
@@ -19,6 +19,8 @@ const SEG = [
 ];
 const COLOR: Record<string, string> = { "miedo-extremo": "var(--sig-strong)", miedo: "var(--olive-deep)", neutral: "var(--ink-soft)", codicia: "var(--terracotta-deep)", "codicia-extrema": "var(--sig-avoid)" };
 const MES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+
+type Cnn = { score: number; previos: { cierre: number; semana: number; mes: number; anio: number }; serie: Array<{ t: number; nivel: number }>; componentes: Array<{ clave: string; nombre: string; score: number; rating: string }> };
 
 /** Velocímetro semicircular 0-100, como el de CNN. */
 function Gauge({ v }: { v: number }) {
@@ -40,7 +42,8 @@ function Gauge({ v }: { v: number }) {
 
 /** Fear & Greed estilo CNN para cuatro índices: velocímetro, lecturas pasadas y la historia por periodos (modelo Invirtiendo). */
 export function FearGreed() {
-  const [sym, setSym] = useState("^GSPC");
+  const [sym, setSym] = useState("CNN");
+  const [cnn, setCnn] = useState<Cnn | null>(null);
   const [per, setPer] = useState<number>(252);
   const [datos, setDatos] = useState<Record<string, PuntoValoracion[]>>({});
   const [w, setW] = useState(0);
@@ -48,6 +51,14 @@ export function FearGreed() {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (datos[sym]) return;
+    if (sym === "CNN") {
+      fetch("/api/fear-greed").then((r) => r.json()).then((j: Cnn) => {
+        if (!j.serie) return;
+        setCnn(j);
+        setDatos((p) => ({ ...p, CNN: j.serie.map((x) => ({ t: x.t, nivel: x.nivel, sp: 0, comps: [0, 0, 0, 0] as [number, number, number, number] })) }));
+      }).catch(() => {});
+      return;
+    }
     fetch(`/api/valoracion-sp500?symbol=${encodeURIComponent(sym)}&largo=1`).then((r) => r.json()).then((j) => j.serie && setDatos((p) => ({ ...p, [sym]: j.serie }))).catch(() => {});
   }, [sym, datos]);
   useEffect(() => {
@@ -93,7 +104,8 @@ export function FearGreed() {
         </div>
         <ul className="divide-y divide-line rounded-xl border border-line">
           {([["Cierre anterior", 1], ["Hace 1 semana", 5], ["Hace 1 mes", 21], ["Hace 3 meses", 63], ["Hace 1 año", 252]] as const).map(([k, n]) => {
-            const p = hace(n);
+            const prev = cnn && sym === "CNN" ? { 1: cnn.previos.cierre, 5: cnn.previos.semana, 21: cnn.previos.mes, 252: cnn.previos.anio }[n as 1 | 5 | 21 | 252] : undefined;
+            const p = prev != null ? { nivel: prev } : hace(n);
             const z = p ? zona(p.nivel) : null;
             return (
               <li key={k} className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">
@@ -142,12 +154,31 @@ export function FearGreed() {
             <div className="pointer-events-none absolute top-1 rounded-xl border border-line bg-paper px-3 py-2 text-xs shadow-md" style={{ left: Math.min(Math.max(x(hover!) - 75, 0), w - 150), width: 150 }}>
               <p className="text-ink-soft">{new Date(h.t).toLocaleDateString("es-CO", { day: "numeric", month: "short", year: "numeric" })}</p>
               <p><b className="num" style={{ color: COLOR[zona(h.nivel).key] }}>{Math.round(h.nivel)}</b> · {zona(h.nivel).label}</p>
-              <p className="text-ink-soft num">{nombre} {Math.round(h.sp).toLocaleString("en-US")}</p>
+              {h.sp > 0 && <p className="text-ink-soft num">{nombre} {Math.round(h.sp).toLocaleString("en-US")}</p>}
             </div>
           )}
         </div>
       </div>
-      <p className="text-[0.68rem] text-ink-soft">Modelo Invirtiendo (inspirado en el de CNN): impulso frente a la media de 200 días, RSI, volatilidad implícita de cada índice (VIX, VXN, RVX, VXD) y distancia al máximo de 52 semanas, en percentiles de los últimos 2 años. Educativo, no es recomendación.</p>
+      {sym === "CNN" && cnn && (
+        <div>
+          <p className="text-[0.62rem] uppercase tracking-wider font-bold text-ink-soft mb-2">Los 7 indicadores que usa CNN</p>
+          <ul className="grid gap-2 sm:grid-cols-2">
+            {cnn.componentes.map((c) => {
+              const z = zona(c.score);
+              return (
+                <li key={c.clave} className="flex items-center justify-between gap-3 rounded-xl border border-line px-3 py-2 text-sm">
+                  <span className="min-w-0">{c.nombre}</span>
+                  <span className="flex shrink-0 items-center gap-2">
+                    <span className="text-xs font-bold" style={{ color: COLOR[z.key] }}>{z.label}</span>
+                    <span className="num font-bold" style={{ color: COLOR[z.key] }}>{Math.round(c.score)}</span>
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+      <p className="text-[0.68rem] text-ink-soft">{sym === "CNN" ? "Fuente: CNN Business Fear & Greed Index (7 indicadores: impulso, fuerza y amplitud de precios, opciones put/call, VIX, demanda de refugio y de bonos basura). " : ""}Nasdaq-100, Russell 2000 y Dow Jones: modelo Invirtiendo (inspirado en el de CNN): impulso frente a la media de 200 días, RSI, volatilidad implícita de cada índice (VIX, VXN, RVX, VXD) y distancia al máximo de 52 semanas, en percentiles de los últimos 2 años. Educativo, no es recomendación.</p>
     </section>
   );
 }
