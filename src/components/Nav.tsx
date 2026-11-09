@@ -8,6 +8,8 @@ import { SearchBox } from "./SearchBox";
 const links = [
   { href: "/", label: "Analizar" },
   { href: "/portafolio", label: "Portafolio" },
+  { href: "/ranking", label: "Ranking" },
+  { href: "/miedo-codicia", label: "Fear & Greed" },
 ];
 
 /** Barra simple: logo, buscador y las dos secciones (en móvil el buscador baja a una segunda fila). */
@@ -25,7 +27,7 @@ export function Nav() {
         <div className="flex-1 max-w-md hidden md:block">
           <SearchBox compact />
         </div>
-        <nav className="ml-auto flex items-center gap-1">
+        <nav className="ml-auto hidden sm:flex items-center gap-1">
           {links.map((l) => (
             <Link key={l.href} href={l.href} aria-current={pathname === l.href ? "page" : undefined} className={item(pathname === l.href)}>
               {l.label}
@@ -33,6 +35,13 @@ export function Nav() {
           ))}
         </nav>
       </div>
+      <nav className="sm:hidden flex gap-1 overflow-x-auto px-3 pb-2 -mt-1">
+        {links.map((l) => (
+          <Link key={l.href} href={l.href} aria-current={pathname === l.href ? "page" : undefined} className={item(pathname === l.href)}>
+            {l.label}
+          </Link>
+        ))}
+      </nav>
       {pathname !== "/" && (
         <div className="md:hidden px-4 pb-3">
           <SearchBox compact />
