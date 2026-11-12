@@ -11,7 +11,8 @@ import { Card, Eyebrow } from "@/components/ui";
 import { fmtMoney, fmtPct } from "@/lib/format";
 
 export async function generateMetadata({ searchParams }: { searchParams: Promise<{ cuenta?: string }> }): Promise<Metadata> {
-  return { title: (await searchParams).cuenta === "ga" ? "Portafolio GA" : "Portafolio Invirtiendoo" };
+  const c = (await searchParams).cuenta;
+  return { title: c === "ga" ? "Portafolio GA" : c === "inv" ? "Portafolio INV" : "Portafolio Invirtiendoo" };
 }
 export const dynamic = "force-dynamic";
 
@@ -29,6 +30,7 @@ const TIPO: Record<MovimientoPublico["tipo"], { txt: string; color: string }> = 
 const CUENTAS = [
   { id: "principal", titulo: "Portafolio Invirtiendoo", h1: "Nuestra cuenta real, a la vista." },
   { id: "ga", titulo: "Portafolio GA", h1: "Portafolio GA, a la vista." },
+  { id: "inv", titulo: "Portafolio INV", h1: "Portafolio INV, desde 2010." },
 ];
 
 export default async function PortafolioPage({ searchParams }: { searchParams: Promise<{ cuenta?: string }> }) {
@@ -62,10 +64,10 @@ export default async function PortafolioPage({ searchParams }: { searchParams: P
   return (
     <div className="pt-8 space-y-6">
       {/* Selector de portafolio: lo primero de la página */}
-      <nav className="inline-flex rounded-full bg-ink p-1 shadow-sm" aria-label="Elegir portafolio">
+      <nav className="inline-flex max-w-full overflow-x-auto rounded-full bg-ink p-1 shadow-sm" aria-label="Elegir portafolio">
         {CUENTAS.map((c) => (
-          <Link key={c.id} href={c.id === "principal" ? "/portafolio" : `/portafolio?cuenta=${c.id}`} aria-current={c.id === cuenta ? "page" : undefined} className={`rounded-full px-5 py-2 text-sm font-bold transition-colors ${c.id === cuenta ? "bg-terracotta text-cream" : "text-[#d8cdb9] hover:text-cream"}`}>
-            {c.titulo}
+          <Link key={c.id} href={c.id === "principal" ? "/portafolio" : `/portafolio?cuenta=${c.id}`} aria-current={c.id === cuenta ? "page" : undefined} className={`whitespace-nowrap rounded-full px-3 sm:px-5 py-2 text-sm font-bold transition-colors ${c.id === cuenta ? "bg-terracotta text-cream" : "text-[#d8cdb9] hover:text-cream"}`}>
+            <span className="hidden sm:inline">Portafolio </span>{c.titulo.replace("Portafolio ", "")}
           </Link>
         ))}
       </nav>
@@ -75,6 +77,8 @@ export default async function PortafolioPage({ searchParams }: { searchParams: P
         <p className="text-ink-soft mt-3 max-w-2xl text-sm">
           {principal
             ? "Cada acción, cada compra y cada venta de nuestra cuenta en Interactive Brokers. Valor y ganancias se calculan en vivo con precios de mercado sobre nuestras posiciones; las posiciones se revisan contra IBKR una vez al día"
+            : cuenta === "inv"
+            ? "Cuenta INV en BTG Pactual, abierta en octubre de 2010. Posiciones y costo según el extracto de BTG; valor y ganancias se calculan en vivo con precios de mercado. Se actualiza con cada extracto mensual"
             : "Posiciones de la cuenta GA en Interactive Brokers. Valor y ganancias se calculan en vivo con precios de mercado sobre sus cantidades y precio promedio; las posiciones se actualizan cuando hay compras o ventas"}
           {act ? ` (última revisión ${new Date(act).toLocaleDateString("es-CO", { timeZone: "America/Bogota", day: "numeric", month: "short" })})` : ""}.
         </p>
