@@ -25,7 +25,7 @@ interface Datos {
   pesos: Array<{ ticker: string; peso: number }>;
 }
 
-const ORDEN: Rango[] = ["1D", "1S", "1M", "3M", "6M", "YTD", "1A", "3A", "5A"];
+const ORDEN: Rango[] = ["1D", "1S", "1M", "2M", "3M", "6M", "YTD", "1A", "2A", "3A", "4A", "5A", "MAX"];
 const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
 
 /** Fecha según el rango: hora de Nueva York en intradía; día y mes; mes y año si el periodo pasa del año. */
@@ -63,7 +63,7 @@ function Grafico({ d, showBB, showEma, ema200, nombre, movs }: { d: Datos; showB
   const { ref, w } = useAncho();
   const [hover, setHover] = useState<number | null>(null);
   const H = w < 480 ? 240 : 320;
-  const pad = { l: 40, r: w < 480 ? 58 : 78, t: 16, b: 28 };
+  const pad = { l: 52, r: w < 480 ? 58 : 78, t: 16, b: 28 };
   const pts = d.puntos;
   // Indicadores sobre la línea del S&P 500 (base 100), en los períodos del gráfico; una EMA solo se dibuja si hay más puntos que su período.
   const cierres = pts.map((p) => p.indice);
@@ -110,7 +110,7 @@ function Grafico({ d, showBB, showEma, ema200, nombre, movs }: { d: Datos; showB
 
   // Marcas del eje en % redondos (base 100 = 0%)
   // En intradía el rango cabe en un punto porcentual: hacen falta pasos de 0.1 a 0.5.
-  const paso = [0.1, 0.2, 0.25, 0.5, 1, 2, 5, 10, 20, 25, 50, 100].find((s) => (max - min) / s <= 5) ?? 200;
+  const paso = [0.1, 0.2, 0.25, 0.5, 1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000].find((s) => (max - min) / s <= 5) ?? 2000;
   const marcas: number[] = [];
   // Contador entero: sumar 0.1 en bucle acumula error y salta marcas.
   for (let k = Math.ceil((min - 100) / paso); k * paso <= max - 100; k++) marcas.push(Number((k * paso).toFixed(2)));
@@ -284,7 +284,7 @@ function Grafico({ d, showBB, showEma, ema200, nombre, movs }: { d: Datos; showB
 export const EVENTO_INDICE = "invirtiendo:indice";
 export type IndiceElegido = { symbol: string; nombre: string };
 
-export function PortafolioVsSP() {
+export function PortafolioVsSP({ cuenta = "principal", titulo = "Portafolio Invirtiendoo" }: { cuenta?: string; titulo?: string }) {
   const [rango, setRango] = useState<Rango>("YTD");
   const [idx, setIdx] = useState<IndiceElegido>({ symbol: "^GSPC", nombre: "S&P 500" });
   useEffect(() => {
@@ -292,11 +292,11 @@ export function PortafolioVsSP() {
     window.addEventListener(EVENTO_INDICE, cambiar);
     return () => window.removeEventListener(EVENTO_INDICE, cambiar);
   }, []);
-  const q = `&indice=${encodeURIComponent(idx.symbol)}`;
+  const q = `&indice=${encodeURIComponent(idx.symbol)}${cuenta === "principal" ? "" : `&cuenta=${cuenta}`}`;
   const [movs, setMovs] = useState<Mov[]>([]);
   useEffect(() => {
-    fetch("/api/movimientos").then((r) => r.json()).then(setMovs).catch(() => {});
-  }, []);
+    fetch(`/api/movimientos?cuenta=${cuenta}`).then((r) => r.json()).then(setMovs).catch(() => {});
+  }, [cuenta]);
   const [datos, setDatos] = useState<Datos | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [cargando, setCargando] = useState(true);
@@ -351,7 +351,7 @@ export function PortafolioVsSP() {
     <Card className="p-5 sm:p-6 scroll-mt-24" id="grafica-inicio">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <Eyebrow>Portafolio Invirtiendoo vs {idx.nombre}</Eyebrow>
+          <Eyebrow>{titulo} vs {idx.nombre}</Eyebrow>
           {d?.enVivo && (
             <p className="mt-1 inline-flex items-center gap-2 text-xs text-ink-soft">
               <span className="relative flex h-2 w-2">
@@ -362,16 +362,16 @@ export function PortafolioVsSP() {
             </p>
           )}
         </div>
-        <div role="group" aria-label="Periodo" className="grid w-full grid-cols-9 gap-1 sm:flex sm:w-auto sm:gap-1.5">
+        <div role="group" aria-label="Periodo" className="flex w-full flex-wrap gap-1 sm:w-auto sm:gap-1.5">
           {ORDEN.map((r) => (
             <button
               key={r}
               type="button"
               aria-pressed={rango === r}
               onClick={() => setRango(r)}
-              className={`min-h-9 rounded-full px-0 text-[0.8rem] font-bold transition-colors sm:min-w-11 sm:px-3 sm:text-sm ${rango === r ? "bg-ink text-cream" : "border border-line text-ink hover:border-terracotta hover:text-terracotta"}`}
+              className={`min-h-9 min-w-10 rounded-full px-2 text-[0.8rem] font-bold transition-colors sm:min-w-11 sm:px-3 sm:text-sm ${rango === r ? "bg-ink text-cream" : "border border-line text-ink hover:border-terracotta hover:text-terracotta"}`}
             >
-              {r}
+              {r === "MAX" ? "Inicio" : r}
             </button>
           ))}
         </div>
@@ -379,7 +379,7 @@ export function PortafolioVsSP() {
 
       <div className={`mt-4 flex flex-wrap items-end gap-x-8 gap-y-2 transition-opacity ${atenuado && d ? "opacity-60" : ""}`}>
         <div>
-          <p className="text-xs font-bold uppercase tracking-wider text-terracotta">Portafolio Invirtiendoo{desde ? ` · desde ${desde}` : ""}</p>
+          <p className="text-xs font-bold uppercase tracking-wider text-terracotta">{titulo}{desde ? ` · desde ${desde}` : ""}</p>
           <p className="num font-display text-4xl leading-none text-terracotta">{d ? fmtPct(d.retorno.portafolio, 1, true) : "—"}</p>
         </div>
         <div>
@@ -409,7 +409,7 @@ export function PortafolioVsSP() {
       {d && (
         <>
           <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-[0.72rem] font-bold">
-            <span className="inline-flex items-center gap-1.5 text-terracotta"><span className="inline-block h-[3px] w-4 rounded bg-terracotta" />Portafolio Invirtiendoo</span>
+            <span className="inline-flex items-center gap-1.5 text-terracotta"><span className="inline-block h-[3px] w-4 rounded bg-terracotta" />{titulo}</span>
             <span className="inline-flex items-center gap-1.5 text-ink-soft"><span className="inline-block h-[2px] w-4 rounded bg-ink-soft" />{idx.nombre}</span>
             <span className="inline-flex items-center gap-1 text-olive-deep">▲ compra</span>
             <span className="inline-flex items-center gap-1" style={{ color: "var(--sig-avoid)" }}>▼ venta</span>
@@ -426,9 +426,15 @@ export function PortafolioVsSP() {
               </span>
             ))}
           </div>
+          {cuenta !== "principal" ? (
+            <p className="mt-3 text-xs leading-relaxed text-ink-soft">
+              Curva simulada: las cantidades que tiene hoy la cuenta por el precio de cierre de cada día, como si se hubieran tenido desde el inicio (no refleja compras ni ventas intermedias ni dividendos). Arranca cuando todas las posiciones ya cotizaban. El índice es de precio, sin dividendos. Rendimientos pasados no aseguran resultados futuros.
+            </p>
+          ) : (
           <p className="mt-3 text-xs leading-relaxed text-ink-soft">
             Cuenta real de Invirtiendoo en Interactive Brokers, empezó en diciembre de 2025: en 1, 3 y 5 años el S&amp;P se ve completo y el portafolio arranca ese día, pegado a su línea. Rendimiento ponderado por tiempo (TWR): los aportes nuevos no cuentan como ganancia. Incluye dividendos; el S&amp;P 500 es el índice de precio, sin dividendos. &quot;Hoy&quot; es un estimado en vivo con los pesos del último cierre; los demás periodos son el dato oficial de IBKR. Rendimientos pasados no aseguran resultados futuros.
           </p>
+          )}
         </>
       )}
     </Card>

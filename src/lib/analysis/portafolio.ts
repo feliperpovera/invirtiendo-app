@@ -16,12 +16,16 @@ export const RANGOS = {
   "1D": { etiqueta: "Hoy", ttl: 60, meses: 0 },
   "1S": { etiqueta: "1 semana", ttl: 900, meses: 0 },
   "1M": { etiqueta: "1 mes", ttl: 900, meses: 1 },
+  "2M": { etiqueta: "2 meses", ttl: 900, meses: 2 },
   "3M": { etiqueta: "3 meses", ttl: 900, meses: 3 },
   "6M": { etiqueta: "6 meses", ttl: 900, meses: 6 },
   YTD: { etiqueta: "En el año", ttl: 900, meses: 0 },
   "1A": { etiqueta: "1 año", ttl: 900, meses: 12 },
+  "2A": { etiqueta: "2 años", ttl: 900, meses: 24 },
   "3A": { etiqueta: "3 años", ttl: 900, meses: 36 },
+  "4A": { etiqueta: "4 años", ttl: 900, meses: 48 },
   "5A": { etiqueta: "5 años", ttl: 900, meses: 60 },
+  MAX: { etiqueta: "Desde el inicio", ttl: 900, meses: 0 },
 } as const;
 export type Rango = keyof typeof RANGOS;
 

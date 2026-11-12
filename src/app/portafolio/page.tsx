@@ -122,7 +122,7 @@ export default async function PortafolioPage({ searchParams }: { searchParams: P
         </section>
       )}
 
-      {principal && <PortafolioVsSP />}
+      <PortafolioVsSP cuenta={cuenta} titulo={CUENTAS.find((c) => c.id === cuenta)!.titulo} />
 
 
       <PosicionesGraficas tickers={pos.map((p) => p.ticker)} movimientos={mov.map((m) => ({ fecha: m.fecha, ticker: m.ticker, tipo: m.tipo }))} />
@@ -164,7 +164,9 @@ export default async function PortafolioPage({ searchParams }: { searchParams: P
       )}
 
       <p className="text-xs text-ink-soft border-t border-line pt-3">
-        Fuente: Interactive Brokers (posiciones, operaciones y valor de la cuenta). Compra prom. y ganancia según IBKR; la ganancia realizada es la que reporta IBKR en cada venta, después de comisiones. La rentabilidad de la cuenta en la gráfica es ponderada en el tiempo (TWR). Contenido educativo; no es una recomendación.
+        {cuenta === "inv"
+          ? "Fuente: extracto mensual de BTG Pactual (cantidades y costo). Precios de mercado en vivo; la gráfica frente al índice es una simulación con las posiciones actuales. Contenido educativo; no es una recomendación."
+          : "Fuente: Interactive Brokers (posiciones, operaciones y valor de la cuenta). Compra prom. y ganancia según IBKR; la ganancia realizada es la que reporta IBKR en cada venta, después de comisiones. " + (principal ? "La rentabilidad de la cuenta en la gráfica es ponderada en el tiempo (TWR). " : "La gráfica frente al índice es una simulación con las posiciones actuales. ") + "Contenido educativo; no es una recomendación."}
       </p>
     </div>
   );
