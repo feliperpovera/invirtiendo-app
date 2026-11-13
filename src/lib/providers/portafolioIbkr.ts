@@ -20,11 +20,20 @@ async function leer<T>(ruta: string): Promise<T> {
 /** Día hábil a medianoche UTC: así una fecha de IBKR y la barra diaria de Yahoo del mismo día coinciden. */
 export const diaUTC = (fecha: string) => Date.parse(`${fecha}T00:00:00Z`);
 
+/** [fecha, YTD % de IBKR] */
+const MANUAL: Array<[string, number]> = [["2026-11-12", 9.16]];
+
 /** Índice de rendimiento ponderado por tiempo (TWR), uno por día, del más viejo al más nuevo. */
 export function nivelesIbkr(): Promise<PricePoint[]> {
   return cached("ibkr:niveles", 10 * 60 * 1000, async () => {
     const filas = await leer<Array<{ fecha: string; nivel: number }>>("portafolio_ibkr?select=fecha,nivel&order=fecha.asc&limit=5000");
-    return filas.map((f) => ({ t: diaUTC(f.fecha), c: Number(f.nivel) })).filter((p) => p.c > 0);
+    const pts = filas.map((f) => ({ t: diaUTC(f.fecha), c: Number(f.nivel) })).filter((p) => p.c > 0);
+    // Cierres leídos a mano de la app de IBKR mientras el conector está caído: YTD oficial.
+    for (const [fecha, ytd] of MANUAL) {
+      const t = diaUTC(fecha), base = [...pts].reverse().find((p) => p.t <= Date.UTC(Number(fecha.slice(0, 4)) - 1, 11, 31));
+      if (base && t > pts[pts.length - 1].t) pts.push({ t, c: base.c * (1 + ytd / 100) });
+    }
+    return pts;
   });
 }
 
