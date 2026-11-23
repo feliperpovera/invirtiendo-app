@@ -30,7 +30,7 @@ export async function GET() {
         rating: f.rating,
         previos: { cierre: f.previous_close, semana: f.previous_1_week, mes: f.previous_1_month, anio: f.previous_1_year },
         serie: (j.fear_and_greed_historical?.data ?? []).map((p) => ({ t: p.x, nivel: p.y })),
-        componentes: Object.entries(NOMBRES).filter(([k]) => j[k]).map(([k, nombre]) => ({ clave: k, nombre, score: j[k].score, rating: j[k].rating })),
+        componentes: Object.entries(NOMBRES).filter(([k]) => j[k]).map(([k, nombre]) => ({ clave: k, nombre, score: j[k].score, rating: j[k].rating, valor: j[k].data?.at(-1)?.y ?? null })),
       };
     });
     return Response.json(d, { headers: { "Cache-Control": "s-maxage=600" } });

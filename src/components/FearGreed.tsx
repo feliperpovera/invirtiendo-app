@@ -20,7 +20,7 @@ const SEG = [
 const COLOR: Record<string, string> = { "miedo-extremo": "var(--sig-strong)", miedo: "var(--olive-deep)", neutral: "var(--ink-soft)", codicia: "var(--terracotta-deep)", "codicia-extrema": "var(--sig-avoid)" };
 const MES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
 
-type Cnn = { score: number; previos: { cierre: number; semana: number; mes: number; anio: number }; serie: Array<{ t: number; nivel: number }>; componentes: Array<{ clave: string; nombre: string; score: number; rating: string }> };
+type Cnn = { score: number; previos: { cierre: number; semana: number; mes: number; anio: number }; serie: Array<{ t: number; nivel: number }>; componentes: Array<{ clave: string; nombre: string; score: number; rating: string; valor: number | null }> };
 
 /** Velocímetro semicircular 0-100, como el de CNN. */
 function Gauge({ v }: { v: number }) {
@@ -167,7 +167,7 @@ export function FearGreed() {
               const z = zona(c.score);
               return (
                 <li key={c.clave} className="flex items-center justify-between gap-3 rounded-xl border border-line px-3 py-2 text-sm">
-                  <span className="min-w-0">{c.nombre}</span>
+                  <span className="min-w-0">{c.nombre}{c.clave === "market_volatility_vix" && c.valor != null && <b className="num ml-1">· VIX {c.valor.toFixed(2)}</b>}</span>
                   <span className="flex shrink-0 items-center gap-2">
                     <span className="text-xs font-bold" style={{ color: COLOR[z.key] }}>{z.label}</span>
                     <span className="num font-bold" style={{ color: COLOR[z.key] }}>{Math.round(c.score)}</span>
