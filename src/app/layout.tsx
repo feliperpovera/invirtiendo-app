@@ -21,7 +21,7 @@ const figtree = Figtree({
 export const metadata: Metadata = {
   title: { default: "Invirtiendo · Evaluador de acciones", template: "%s · Invirtiendo" },
   description: "Evalúa acciones de EE. UU. con el proceso de 7 filtros estilo Buffett: negocio, moat, números, dueños, diez años, precio y plan. Datos reales, noticias calificadas y watchlist.",
-  icons: { icon: "/brand/icono.png" },
+  icons: { icon: "/brand/favicon.svg", apple: "/brand/icono.png" },
   openGraph: { title: "Invirtiendo · Evaluador de acciones", description: "El checklist Invirtiendo con datos reales.", images: ["/brand/logo-horizontal.png"] },
 };
 
