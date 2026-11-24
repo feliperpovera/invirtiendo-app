@@ -5,6 +5,8 @@ import Link from "next/link";
 import type { RankingRow } from "@/lib/providers/ranking";
 import type { SignalKey } from "@/lib/analysis/types";
 import { Card, SignalPill } from "./ui";
+import { ordenar } from "@/lib/orden";
+import { SelectOrden, ThOrden, useOrden } from "./Orden";
 import { TickerLogo } from "./TickerLogo";
 import { fmtBig, fmtMoney, fmtPct, isNum } from "@/lib/format";
 
@@ -12,12 +14,13 @@ const colorMos = (mos: number | null) => (isNum(mos) ? (mos >= 15 ? "var(--sig-s
 
 const SENALES: Array<[string, string]> = [["strong", "Strong Buy"], ["good", "Buy Zone"], ["watch", "Watch"], ["wait", "Wait"], ["avoid", "Avoid"]];
 const CAPS: Array<[string, number]> = [["Todas", 0], [">$10B", 1e10], [">$100B", 1e11], [">$1T", 1e12]];
-type Orden = "score" | "mos" | "fwd_pe" | "market_cap" | "precio" | "grade" | "senal";
+type Orden = "score" | "mos" | "fwd_pe" | "market_cap" | "precio" | "grade" | "senal" | "ticker" | "sector" | "fair_value";
 const PESO_NOTA: Record<string, number> = { A: 5, B: 4, C: 3, D: 2, F: 1 };
 const PESO_SENAL: Record<string, number> = { strong: 5, good: 4, watch: 3, wait: 2, avoid: 1 };
 const RANKEAR: Array<[Orden, string]> = [["score", "Score Invirtiendo"], ["mos", "Margen de seguridad"], ["grade", "Calificación"], ["senal", "Señal"]];
+const OPC: Array<[Orden, string]> = [["score", "Score"], ["ticker", "Acción"], ["sector", "Sector"], ["senal", "Señal"], ["precio", "Precio"], ["market_cap", "Cap. mercado"], ["fwd_pe", "Fwd P/E"], ["fair_value", "Fair Value"], ["mos", "Margen"], ["grade", "Calificación"]];
 /** Valor numérico para ordenar: nota y señal se pasan a escala; empata por score. */
-const valorOrden = (f: RankingRow, k: Orden) => (k === "grade" ? (PESO_NOTA[f.grade ?? ""] ?? 0) * 1000 + f.score : k === "senal" ? (PESO_SENAL[f.senal_key ?? ""] ?? 0) * 1000 + (f.mos ?? -999) / 1000 + f.score : (f[k] as number | null));
+const valorOrden = (f: RankingRow, k: Orden) => (k === "grade" ? (PESO_NOTA[f.grade ?? ""] ?? 0) * 1000 + f.score : k === "senal" ? (PESO_SENAL[f.senal_key ?? ""] ?? 0) * 1000 + (f.mos ?? -999) / 1000 + f.score : k === "fwd_pe" ? (isNum(f.fwd_pe) && f.fwd_pe > 0 ? f.fwd_pe : null) : f[k]);
 
 /**
  * Ranking + screener (al estilo TradingView) sobre NUESTROS cálculos: señal, margen de seguridad, score y nota.
@@ -31,9 +34,10 @@ export function Ranking({ filas }: { filas: RankingRow[] }) {
   const [peMax, setPeMax] = useState(0);
   const [capMin, setCapMin] = useState(0);
   const [nota, setNota] = useState("");
-  const [orden, setOrden] = useState<{ k: Orden; desc: boolean }>({ k: "score", desc: true });
+  const ctl = useOrden<Orden>("score", true, ["ticker", "sector"]);
+  const { o: orden, setO: setOrden } = ctl;
   const sectores = useMemo(() => [...new Set(filas.map((f) => f.sector).filter(Boolean) as string[])].sort(), [filas]);
-  const vista = useMemo(() => {
+  const filtradas = useMemo(() => {
     const t = q.trim().toUpperCase();
     return filas
       .filter((f) => !t || f.ticker.includes(t) || (f.nombre ?? "").toUpperCase().includes(t))
@@ -42,26 +46,20 @@ export function Ranking({ filas }: { filas: RankingRow[] }) {
       .filter((f) => mosMin <= -100 || (isNum(f.mos) && f.mos >= mosMin))
       .filter((f) => !peMax || (isNum(f.fwd_pe) && f.fwd_pe > 0 && f.fwd_pe <= peMax))
       .filter((f) => !capMin || (isNum(f.market_cap) && f.market_cap >= capMin))
-      .filter((f) => !nota || (f.grade ?? "") <= nota)
-      .sort((a, b) => {
-        const x = valorOrden(a, orden.k) ?? -Infinity, y = valorOrden(b, orden.k) ?? -Infinity;
-        return (orden.desc ? -1 : 1) * ((x as number) - (y as number));
-      });
-  }, [filas, q, sector, senales, mosMin, peMax, capMin, nota, orden]);
+      .filter((f) => !nota || (f.grade ?? "") <= nota);
+  }, [filas, q, sector, senales, mosMin, peMax, capMin, nota]);
+  const vista = ordenar(filtradas, (f) => valorOrden(f, orden.k), orden.desc);
+  // El Top 5 siempre es "lo mejor": no se invierte al ordenar la tabla al revés
+  const claveTop = RANKEAR.some(([k]) => k === orden.k) ? orden.k : "score";
+  const top = ordenar(filtradas, (f) => valorOrden(f, claveTop), true).slice(0, 5);
   if (!filas.length) return <p className="text-sm text-ink-soft">Todavía no hay acciones evaluadas.</p>;
   const filtrado = vista.length !== filas.length;
-  const th = (k: Orden, label: string) => (
-    <th className="num">
-      <button type="button" className="uppercase tracking-wider hover:text-terracotta" onClick={() => setOrden((o) => ({ k, desc: o.k === k ? !o.desc : true }))}>
-        {label} {orden.k === k ? (orden.desc ? "▼" : "▲") : ""}
-      </button>
-    </th>
-  );
+  const th = (k: Orden, label: string, className = "num") => <ThOrden ctl={ctl} k={k} className={className}>{label}</ThOrden>;
   const limpiar = () => { setQ(""); setSector(""); setSenales([]); setMosMin(-100); setPeMax(0); setCapMin(0); setNota(""); };
 
   const conteo = (k: string) => filas.filter((f) => f.senal_key === k).length;
   const segmento = senales.length === 1 ? senales[0] : "";
-  const nombreOrden = RANKEAR.find(([k]) => k === orden.k)?.[1] ?? "";
+  const nombreOrden = RANKEAR.find(([k]) => k === claveTop)?.[1] ?? "";
 
   return (
     <div className="space-y-5">
@@ -87,7 +85,7 @@ export function Ranking({ filas }: { filas: RankingRow[] }) {
 
       <p className="eyebrow">Top 5 · {segmento ? SENALES.find(([k]) => k === segmento)?.[1] : "todas"} · por {nombreOrden.toLowerCase()}</p>
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        {vista.slice(0, 5).map((r, i) => (
+        {top.map((r, i) => (
           <Link key={r.ticker} href={`/accion/${r.ticker}`} className="card p-4 hover:border-terracotta transition-colors">
             <div className="flex items-start justify-between gap-2">
               <span className="font-display text-3xl leading-none text-terracotta">{i + 1}</span>
@@ -126,6 +124,7 @@ export function Ranking({ filas }: { filas: RankingRow[] }) {
             <option value="B">Nota B o mejor</option>
             <option value="C">Nota C o mejor</option>
           </select>
+          <SelectOrden ctl={ctl} opciones={OPC} />
           {filtrado && <button type="button" onClick={limpiar} className="text-xs underline text-ink-soft ml-auto">Limpiar filtros</button>}
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-xs">
@@ -147,14 +146,14 @@ export function Ranking({ filas }: { filas: RankingRow[] }) {
             <thead>
               <tr>
                 <th>#</th>
-                <th>Acción</th>
-                <th className="hidden 2xl:table-cell">Sector</th>
+                {th("ticker", "Acción", "")}
+                {th("sector", "Sector", "hidden 2xl:table-cell")}
                 {th("score", "Score")}
-                <th>Señal</th>
+                {th("senal", "Señal", "")}
                 {th("precio", "Precio")}
                 {th("market_cap", "Cap. mercado")}
                 {th("fwd_pe", "Fwd P/E")}
-                <th className="num">Fair Value</th>
+                {th("fair_value", "Fair Value")}
                 {th("mos", "Margen")}
               </tr>
             </thead>

@@ -5,6 +5,8 @@ import Link from "next/link";
 import type { RiskResult, PeersResult, SentimentResult, CheckItem, NewsItem, SentLabel, ShortInterest, WsbSentiment } from "@/lib/analysis/types";
 import { Card, Eyebrow, VerdictPill } from "@/components/ui";
 import { fmtMoney, fmtBig, fmtX, fmtPct, isNum } from "@/lib/format";
+import { ordenar } from "@/lib/orden";
+import { ThOrden, useOrden } from "@/components/Orden";
 import { TimeAgo } from "@/components/ClientTime";
 import { FUENTE_URL } from "@/lib/atribucion";
 
@@ -111,7 +113,17 @@ export function RiskCard({ risk, shortInterest }: { risk: RiskResult; shortInter
   );
 }
 
+const COL_PEERS = [["symbol", "Ticker"], ["marketCap", "Cap."], ["pe", "P/E"], ["forwardPe", "Fwd P/E"], ["peg", "PEG"], ["ps", "P/S"], ["grossMargin", "M. bruto"], ["operatingMargin", "M. oper."], ["roe", "ROE"], ["revenueGrowthTTM", "Crec. ing."]] as const;
+type KPeer = (typeof COL_PEERS)[number][0];
+
 export function PeersCard({ peers, symbol }: { peers: PeersResult; symbol: string }) {
+  const ctl = useOrden<KPeer>("marketCap", true, ["symbol"]);
+  // Igual que en pantalla: un múltiplo no positivo (o un PEG fuera de rango) cuenta como vacío
+  const multiplos: KPeer[] = ["pe", "forwardPe", "peg", "ps"];
+  const vista = ordenar(peers.rows, (r) => {
+    const v = r[ctl.o.k];
+    return multiplos.includes(ctl.o.k) && (!isNum(v) || v <= 0 || (ctl.o.k === "peg" && v >= 10)) ? null : v;
+  }, ctl.o.desc);
   return (
     <Card className="p-0 overflow-hidden">
       <div className="p-5 pb-3 flex items-start justify-between gap-3">
@@ -125,20 +137,11 @@ export function PeersCard({ peers, symbol }: { peers: PeersResult; symbol: strin
         <table className="table text-[0.82rem] min-w-[640px]">
           <thead>
             <tr>
-              <th>Ticker</th>
-              <th className="num">Cap.</th>
-              <th className="num">P/E</th>
-              <th className="num">Fwd P/E</th>
-              <th className="num">PEG</th>
-              <th className="num">P/S</th>
-              <th className="num">M. bruto</th>
-              <th className="num">M. oper.</th>
-              <th className="num">ROE</th>
-              <th className="num">Crec. ing.</th>
+              {COL_PEERS.map(([k, l]) => <ThOrden key={k} ctl={ctl} k={k} className={k === "symbol" ? "" : "num"}>{l}</ThOrden>)}
             </tr>
           </thead>
           <tbody>
-            {peers.rows.map((r) => (
+            {vista.map((r) => (
               <tr key={r.symbol} className={r.isSubject ? "bg-terracotta-tint/70 font-semibold" : ""}>
                 <td>
                   {r.isSubject ? (

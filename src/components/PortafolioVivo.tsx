@@ -5,9 +5,15 @@ import Link from "next/link";
 import type { PosicionPublica } from "@/lib/providers/portafolioPublico";
 import type { Rendimiento } from "@/app/api/rendimientos/route";
 import { Card, Eyebrow, SignalPill } from "./ui";
+import { ordenar } from "@/lib/orden";
+import { BotonOrden, SelectOrden, useOrden } from "./Orden";
 import { TickerLogo } from "./TickerLogo";
 import { fmtMoney, fmtPct } from "@/lib/format";
 import type { SignalKey, Quote } from "@/lib/analysis/types";
+
+const OPC = [["valor", "Valor"], ["ticker", "Acción"], ["precio", "Precio"], ["hoy", "Hoy"], ["s1", "1 sem"], ["m1", "1 mes"], ["m6", "6 meses"], ["ganancia", "Ganancia"], ["senal", "Señal"]] as const;
+type KPos = (typeof OPC)[number][0];
+const PESO_SENAL: Record<string, number> = { strong: 5, good: 4, watch: 3, wait: 2, avoid: 1 };
 
 const PERIODOS = [
   ["1D", "Hoy"],
@@ -130,6 +136,18 @@ export function PortafolioEnVivo({ pos, senales, efectivo, realizado, ventas = {
     const hoy = qt?.changePct ?? (ant ? (precio / ant - 1) * 100 : null);
     return { p, r, precio, valor, hoy, pnl: valor - cant * (p.precio_prom ?? 0), pnlDia: ant ? (precio - ant) * cant : p.pnl_dia };
   });
+  const ctl = useOrden<KPos>("valor", true, ["ticker"]);
+  const vista = ordenar(filas, (f) => {
+    switch (ctl.o.k) {
+      case "ticker": return f.p.ticker;
+      case "precio": return f.precio;
+      case "hoy": return f.hoy;
+      case "s1": case "m1": case "m6": return f.r?.[ctl.o.k];
+      case "ganancia": return f.pnl + (ventas[f.p.ticker]?.realizado ?? 0);
+      case "senal": return PESO_SENAL[senales[f.p.ticker]?.key ?? ""];
+      default: return f.valor;
+    }
+  }, ctl.o.desc);
   const total = filas.reduce((a, f) => a + f.valor, 0);
   const dia = filas.reduce((a, f) => a + (f.pnlDia ?? 0), 0);
   const pnl = filas.reduce((a, f) => a + f.pnl, 0);
@@ -176,20 +194,21 @@ export function PortafolioEnVivo({ pos, senales, efectivo, realizado, ventas = {
           Valor <b className="text-ink">{fmtMoney(total)}</b> · hoy <b style={{ color: tono(dia) }}>{signo(dia)}</b> · ganancia total <b style={{ color: tono(totalGan) }}>{signo(totalGan)}</b> ({fmtPct(rentTotal, 1, true)}, incluye ventas)
         </p>
       </div>
+      <SelectOrden ctl={ctl} opciones={OPC} className="mb-2 lg:hidden" />
       <Card className="p-0 overflow-hidden">
         <div className={`grid ${COLS} gap-x-3 px-4 py-2 text-[0.6rem] uppercase tracking-wider text-ink-soft border-b border-line`}>
-          <span>Acción</span>
-          <span className="text-right">Precio</span>
-          <span className="text-right">Hoy</span>
-          <span className="hidden lg:block text-right">Valor</span>
-          <span className="hidden lg:block text-right">1 sem</span>
-          <span className="hidden lg:block text-right">1 mes</span>
-          <span className="hidden lg:block text-right">6 meses</span>
-          <span className="hidden lg:block text-right">Ganancia</span>
-          <span className="hidden lg:block text-right">Señal</span>
+          <span><BotonOrden ctl={ctl} k="ticker">Acción</BotonOrden></span>
+          <span className="text-right"><BotonOrden ctl={ctl} k="precio">Precio</BotonOrden></span>
+          <span className="text-right"><BotonOrden ctl={ctl} k="hoy">Hoy</BotonOrden></span>
+          <span className="hidden lg:block text-right"><BotonOrden ctl={ctl} k="valor">Valor</BotonOrden></span>
+          <span className="hidden lg:block text-right"><BotonOrden ctl={ctl} k="s1">1 sem</BotonOrden></span>
+          <span className="hidden lg:block text-right"><BotonOrden ctl={ctl} k="m1">1 mes</BotonOrden></span>
+          <span className="hidden lg:block text-right"><BotonOrden ctl={ctl} k="m6">6 meses</BotonOrden></span>
+          <span className="hidden lg:block text-right"><BotonOrden ctl={ctl} k="ganancia">Ganancia</BotonOrden></span>
+          <span className="hidden lg:block text-right"><BotonOrden ctl={ctl} k="senal">Señal</BotonOrden></span>
         </div>
         <ul className="divide-y divide-line">
-          {filas.map(({ p, r, precio, valor, hoy, pnl, pnlDia }) => {
+          {vista.map(({ p, r, precio, valor, hoy, pnl, pnlDia }) => {
             const s = senales[p.ticker];
             return (
               <li key={p.ticker} className={`grid ${COLS} gap-x-3 items-center px-4 py-2 text-sm`}>
@@ -242,6 +261,7 @@ function Torta({ filas, efectivo }: { filas: Array<{ ticker: string; valor: numb
   const datos = [...filas].sort((a, b) => b.valor - a.valor).concat(efectivo > 0 ? [{ ticker: "Efectivo", valor: efectivo }] : []);
   const total = datos.reduce((a, d) => a + d.valor, 0);
   const [hover, setHover] = useState<string | null>(null);
+  const ctl = useOrden<"valor" | "ticker">("valor", true, ["ticker"]);
   if (!total) return null;
   const R = 90, r = 56, C = 100;
   let ang = -Math.PI / 2;
@@ -255,7 +275,10 @@ function Torta({ filas, efectivo }: { filas: Array<{ ticker: string; valor: numb
   const foco = arcos.find((a) => a.ticker === hover) ?? arcos[0];
   return (
     <section>
-      <Eyebrow className="mb-2">Cómo está repartido el portafolio</Eyebrow>
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+        <Eyebrow>Cómo está repartido el portafolio</Eyebrow>
+        <SelectOrden ctl={ctl} opciones={[["valor", "Peso"], ["ticker", "Acción"]]} />
+      </div>
       <Card className="p-4 flex flex-col sm:flex-row items-center gap-6">
         <svg viewBox="0 0 200 200" className="w-52 h-52 shrink-0" role="img" aria-label="Distribución del portafolio por posición">
           {arcos.map((a) => (
@@ -264,11 +287,11 @@ function Torta({ filas, efectivo }: { filas: Array<{ ticker: string; valor: numb
           <text x="100" y="94" textAnchor="middle" fontSize="15" fontWeight="700" fill="var(--ink)">{foco.ticker}</text>
           <text x="100" y="114" textAnchor="middle" fontSize="13" fill="var(--ink-soft)">{((foco.valor / total) * 100).toFixed(1)}%</text>
         </svg>
-        <ul className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-sm w-full">
-          {arcos.map((a) => (
-            <li key={a.ticker} className="flex items-center gap-2" onMouseEnter={() => setHover(a.ticker)} onMouseLeave={() => setHover(null)}>
+        <ul className="grid grid-cols-2 gap-x-3 sm:gap-x-6 gap-y-1.5 text-sm w-full">
+          {ordenar(arcos, (a) => a[ctl.o.k], ctl.o.desc).map((a) => (
+            <li key={a.ticker} className="flex items-center gap-1 sm:gap-2 min-w-0" onMouseEnter={() => setHover(a.ticker)} onMouseLeave={() => setHover(null)}>
               <span className="h-3 w-3 rounded-sm shrink-0" style={{ background: a.color }} />
-              <b className="w-16">{a.ticker}</b>
+              <b className="w-12 sm:w-16 truncate">{a.ticker}</b>
               <span className="num text-ink-soft">{((a.valor / total) * 100).toFixed(1)}%</span>
               <span className="num text-xs text-ink-soft ml-auto">{fmtMoney(a.valor)}</span>
             </li>

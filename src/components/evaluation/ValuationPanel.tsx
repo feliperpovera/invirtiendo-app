@@ -4,6 +4,8 @@ import type { ValuationResult, LynchAssumptions } from "@/lib/analysis/types";
 import type { Adjusted } from "@/lib/analysis/adjust";
 import { PE_MIN } from "@/lib/analysis/forward";
 import { Card, Eyebrow } from "@/components/ui";
+import { ordenar } from "@/lib/orden";
+import { ThOrden, useOrden } from "@/components/Orden";
 import { fmtMoney, fmtPct, fmtX, isNum } from "@/lib/format";
 
 function Slider({ label, value, min, max, step, onChange, suffix = "%", hint }: { label: string; value: number; min: number; max: number; step: number; onChange: (v: number) => void; suffix?: string; hint?: string }) {
@@ -53,8 +55,21 @@ export function ValuationPanel({ v, adjusted, assump, setAssump }: { v: Valuatio
     ["P/S", fmtX(m.ps)],
     ["P/FCF", fmtX(m.pFcf)],
   ];
+  const ctl = useOrden<"nombre" | "valor" | "vs" | "tipo">("tipo", false, ["nombre", "tipo"]);
   const modelos = v.platforms.filter((p) => p.tipo === "modelo");
   const objetivos = v.platforms.filter((p) => p.tipo === "objetivo");
+
+  // "Fair Value" queda fijo arriba; se ordenan las fuentes (por tipo: modelo, plataforma, objetivo)
+  const TIPOS: Record<string, number> = { modelo: 0, plataforma: 1, objetivo: 2 };
+  const fuentes = ordenar(
+    [
+      { name: "Modelo adelantado", v: adjusted.modelo, tag: "modelo", href: undefined as string | undefined, note: assump.eps > 0 ? `EPS próximo año ${fmtMoney(assump.eps)} × P/E justo ${adjusted.fairPe.toFixed(1)}x (crecimiento ${fmtPct(assump.growth, 0)} recortado por prudencia, entre ${PE_MIN}x y ${assump.capPe}x)` : "Sin EPS estimado positivo para el próximo año" },
+      ...modelos.map((p) => ({ name: p.fuente, v: p.valor, tag: "plataforma", href: p.url || undefined, note: "Fair Value propio de la plataforma" })),
+      ...objetivos.map((p) => ({ name: p.fuente, v: p.valor, tag: "objetivo", href: p.url || undefined, note: "Precio objetivo promedio a 12 meses; cuenta una sola vez en la mediana" })),
+    ],
+    (f) => (ctl.o.k === "nombre" ? f.name : ctl.o.k === "tipo" ? TIPOS[f.tag] : f.v),
+    ctl.o.desc,
+  );
 
   return (
     <section>
@@ -65,27 +80,15 @@ export function ValuationPanel({ v, adjusted, assump, setAssump }: { v: Valuatio
             <table className="table">
               <thead>
                 <tr>
-                  <th>Fuente</th>
-                  <th className="num">Valor</th>
-                  <th className="num">vs precio</th>
-                  <th></th>
+                  <ThOrden ctl={ctl} k="nombre">Fuente</ThOrden>
+                  <ThOrden ctl={ctl} k="valor" className="num">Valor</ThOrden>
+                  <ThOrden ctl={ctl} k="vs" className="num">vs precio</ThOrden>
+                  <ThOrden ctl={ctl} k="tipo">Tipo</ThOrden>
                 </tr>
               </thead>
               <tbody>
                 <Row name="Fair Value" v={adjusted.blended} price={v.price} tag="mediana" note={`Mediana de ${v.components.length} fuentes: ni la más optimista ni la más pesimista manda`} bold />
-                <Row
-                  name="Modelo adelantado"
-                  v={adjusted.modelo}
-                  price={v.price}
-                  tag="modelo"
-                  note={assump.eps > 0 ? `EPS próximo año ${fmtMoney(assump.eps)} × P/E justo ${adjusted.fairPe.toFixed(1)}x (crecimiento ${fmtPct(assump.growth, 0)} recortado por prudencia, entre ${PE_MIN}x y ${assump.capPe}x)` : "Sin EPS estimado positivo para el próximo año"}
-                />
-                {modelos.map((p) => (
-                  <Row key={p.fuente} name={p.fuente} v={p.valor} price={v.price} tag="plataforma" note="Fair Value propio de la plataforma" href={p.url || undefined} />
-                ))}
-                {objetivos.map((p) => (
-                  <Row key={p.fuente} name={p.fuente} v={p.valor} price={v.price} tag="objetivo" note="Precio objetivo promedio a 12 meses; cuenta una sola vez en la mediana" href={p.url || undefined} />
-                ))}
+                {fuentes.map((f) => <Row key={f.name} {...f} price={v.price} />)}
                 {v.platformsFailed.length > 0 && (
                   <tr>
                     <td colSpan={4} className="text-xs text-ink-soft py-2">

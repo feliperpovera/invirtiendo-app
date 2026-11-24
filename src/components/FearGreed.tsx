@@ -1,5 +1,7 @@
 "use client";
 
+import { ordenar } from "@/lib/orden";
+import { SelectOrden, useOrden } from "./Orden";
 import { useEffect, useRef, useState } from "react";
 import { zona, type PuntoValoracion } from "@/lib/analysis/valoracionSP";
 
@@ -42,6 +44,7 @@ function Gauge({ v }: { v: number }) {
 
 /** Fear & Greed estilo CNN para cuatro índices: velocímetro, lecturas pasadas y la historia por periodos (modelo Invirtiendo). */
 export function FearGreed() {
+  const ctl = useOrden<"cnn" | "score" | "nombre">("cnn", true, ["nombre"]);
   const [sym, setSym] = useState("CNN");
   const [cnn, setCnn] = useState<Cnn | null>(null);
   const [per, setPer] = useState<number>(252);
@@ -161,9 +164,12 @@ export function FearGreed() {
       </div>
       {sym === "CNN" && cnn && (
         <div>
-          <p className="text-[0.62rem] uppercase tracking-wider font-bold text-ink-soft mb-2">Los 7 indicadores que usa CNN</p>
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+            <p className="text-[0.62rem] uppercase tracking-wider font-bold text-ink-soft">Los 7 indicadores que usa CNN</p>
+            <SelectOrden ctl={ctl} opciones={[["cnn", "Orden de CNN"], ["score", "Puntaje"], ["nombre", "Indicador"]]} />
+          </div>
           <ul className="grid gap-2 sm:grid-cols-2">
-            {cnn.componentes.map((c) => {
+            {ordenar(cnn.componentes, (c) => (ctl.o.k === "cnn" ? -cnn.componentes.indexOf(c) : c[ctl.o.k]), ctl.o.desc).map((c) => {
               const z = zona(c.score);
               return (
                 <li key={c.clave} className="flex items-center justify-between gap-3 rounded-xl border border-line px-3 py-2 text-sm">

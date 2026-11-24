@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import type { PricePoint } from "@/lib/analysis/types";
 import { Card, Eyebrow } from "./ui";
+import { ordenar } from "@/lib/orden";
+import { SelectOrden, useOrden } from "./Orden";
 import { TickerLogo } from "./TickerLogo";
 import { fmtMoney, fmtPct } from "@/lib/format";
 
@@ -67,10 +69,16 @@ export function PosicionesGraficas({ tickers, movimientos }: { tickers: string[]
     };
   }, [rango, tickers]);
 
+  const ctl = useOrden<"valor" | "ticker" | "precio" | "cambio">("valor", true, ["ticker"]);
+  const vista = ordenar(tickers, (t) => {
+    const pts = series[t]?.points, u = pts?.at(-1)?.c, b = series[t]?.base ?? pts?.[0]?.c;
+    return ctl.o.k === "ticker" ? t : ctl.o.k === "precio" ? u : ctl.o.k === "cambio" ? (u != null && b ? u / b - 1 : null) : -tickers.indexOf(t);
+  }, ctl.o.desc);
   return (
     <section>
       <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
         <Eyebrow>Cada acción, una a una</Eyebrow>
+        <SelectOrden ctl={ctl} opciones={[["valor", "Posición"], ["ticker", "Acción"], ["precio", "Precio"], ["cambio", "Cambio %"]]} />
         <div role="group" aria-label="Periodo" className="flex flex-wrap gap-1">
           {RANGOS.map((r) => (
             <button key={r} type="button" aria-pressed={rango === r} onClick={() => setRango(r)} className={`rounded-full px-2.5 py-1 text-xs font-bold ${rango === r ? "bg-ink text-cream" : "border border-line text-ink-soft hover:border-ink"}`}>
@@ -80,7 +88,7 @@ export function PosicionesGraficas({ tickers, movimientos }: { tickers: string[]
         </div>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-        {tickers.map((t) => {
+        {vista.map((t) => {
           const s = series[t];
           const ult = s?.points.at(-1)?.c ?? null;
           const base = s?.base ?? s?.points[0]?.c ?? null;
