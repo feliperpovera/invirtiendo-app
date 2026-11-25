@@ -3,7 +3,7 @@ import { yahooSerie } from "@/lib/providers/yahoo";
 import type { PricePoint } from "@/lib/analysis/types";
 import { INDICES_COMPARABLES } from "@/lib/providers/mercados";
 import { cached } from "@/lib/providers/cache";
-import { nivelesIbkr, pesosIbkr } from "@/lib/providers/portafolioIbkr";
+import { nivelesIbkr, pesosApertura, pesosIbkr } from "@/lib/providers/portafolioIbkr";
 import { leerPosiciones, leerMovimientos } from "@/lib/providers/portafolioPublico";
 import {
   aDia,
@@ -21,7 +21,7 @@ import {
 
 /**
  * Portafolio Invirtiendoo (cuenta real en IBKR) contra el S&P 500: `GET /api/portafolio?rango=YTD`.
- * - Históricos: rendimiento ponderado por tiempo de IBKR hasta su último cierre, más un punto
+ * - Históricos: rendimiento ponderado por tiempo con las órdenes guardadas, más un punto
  *   "ahora" con los pesos de las posiciones × precio actual. Se refresca cada minuto.
  * - `1D`: la sesión de hoy completa, estimada con los mismos pesos.
  */
@@ -75,10 +75,11 @@ export async function GET(req: NextRequest) {
     const pesos = await pesosIbkr();
 
     if (rango === "1D") {
+      const abre = await pesosApertura();
       const data = await cached(`portafolio:ibkr:1D:${indice}`, MINUTO, async () => {
-        const [serieIdx, ...resto] = await intradia([indice, ...pesos.map((p) => p.ticker)]);
+        const [serieIdx, ...resto] = await intradia([indice, ...abre.map((p) => p.ticker)]);
         if (!serieIdx) throw new Error("Sin datos del índice");
-        const comp = compararConIndice(serieIdx, pesos.map((p, i) => ({ ticker: p.ticker, peso: p.peso, serie: resto[i] })));
+        const comp = compararConIndice(serieIdx, abre.map((p, i) => ({ ticker: p.ticker, peso: p.peso, serie: resto[i] })));
         if (!comp) throw new Error("Sin datos de hoy");
         return comp;
       });

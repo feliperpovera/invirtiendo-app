@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import Link from "next/link";
 import type { PosicionPublica } from "@/lib/providers/portafolioPublico";
 import type { Rendimiento } from "@/app/api/rendimientos/route";
 import { Card, Eyebrow, SignalPill } from "./ui";
+import { diaNY, ganaHoy, type Op } from "@/lib/hoy";
 import { ordenar } from "@/lib/orden";
 import { BotonOrden, SelectOrden, useOrden } from "./Orden";
 import { TickerLogo } from "./TickerLogo";
@@ -45,8 +46,9 @@ function useCadaMinuto<T>(url: string | null, inicial: T): T {
   return d;
 }
 
-/** Franja de rendimiento de la cuenta por periodo (TWR de IBKR + hoy estimado en vivo) frente al S&P 500. */
+/** Franja de rendimiento por periodo (TWR calculado con las órdenes; "Hoy" = misma cifra en vivo de arriba, sin efectivo) frente al S&P 500. */
 export function RendimientoCuenta() {
+  const { hoyInvertido } = useCuentaViva();
   const [ret, setRet] = useState<Record<string, Ret | null>>({});
   useEffect(() => {
     let vivo = true;
@@ -65,7 +67,8 @@ export function RendimientoCuenta() {
   return (
     <div className="grid grid-cols-3 lg:grid-cols-6 gap-2">
       {PERIODOS.map(([r, l]) => {
-        const v = ret[r];
+        const x = ret[r];
+        const v = r === "1D" ? (x && hoyInvertido != null ? { ...x, portafolio: hoyInvertido } : null) : x;
         const dif = v ? v.portafolio - v.indiceComun : null;
         return (
           <Card key={r} className="p-3">
@@ -94,6 +97,7 @@ export function RendimientoCuenta() {
 function useCotizaciones(tickers: string[]) {
   const [q, setQ] = useState<Record<string, Quote | null>>({});
   const [asOf, setAsOf] = useState<number | null>(null);
+  const [fallo, setFallo] = useState(false);
   const key = tickers.join(",");
   useEffect(() => {
     if (!key) return;
@@ -104,9 +108,10 @@ function useCotizaciones(tickers: string[]) {
         .then((j) => {
           if (!vivo) return;
           setQ(j.quotes ?? {});
+          setFallo(false);
           setAsOf(j.asOf ?? Date.now());
         })
-        .catch(() => {});
+        .catch(() => vivo && setFallo(true));
     cargar();
     const t = setInterval(cargar, 15_000);
     return () => {
@@ -114,17 +119,19 @@ function useCotizaciones(tickers: string[]) {
       clearInterval(t);
     };
   }, [key]);
-  return { q, asOf };
+  return { q, asOf, fallo };
 }
 
 /**
- * La cuenta calculada en vivo con NUESTRO sistema: cantidades y precio promedio (sincronizados de IBKR una vez al día,
- * solo para detectar compras/ventas) × precio de mercado de este momento. Valor, ganancia del día y ganancia total
- * no dependen del corte diario de IBKR.
+ * La cuenta en vivo: cantidades y precio promedio de las órdenes cargadas × precio de mercado de este momento.
  */
-export function PortafolioEnVivo({ pos, senales, efectivo, realizado, ventas = {} }: { pos: PosicionPublica[]; senales: Record<string, { key: string; label: string } | undefined>; efectivo: number | null; realizado: number; ventas?: Record<string, { realizado: number; costo: number }> }) {
+type Cuenta = ReturnType<typeof useCuenta>;
+const CuentaCtx = createContext<Cuenta | null>(null);
+type Ventas = Record<string, { realizado: number; costo: number }>;
+
+function useCuenta(pos: PosicionPublica[], ops: Op[], efectivo: number | null) {
   const tickers = pos.map((p) => p.ticker);
-  const { q, asOf } = useCotizaciones(tickers);
+  const { q, asOf, fallo } = useCotizaciones(tickers);
   const rend = useCadaMinuto<Record<string, Rendimiento | null>>(pos.length ? `/api/rendimientos?symbols=${tickers.join(",")}` : null, {});
   const filas = pos.map((p) => {
     const r = rend[p.ticker];
@@ -134,8 +141,44 @@ export function PortafolioEnVivo({ pos, senales, efectivo, realizado, ventas = {
     const valor = cant * precio;
     const ant = qt?.prevClose ?? (r?.hoy != null ? (r.precio ?? precio) / (1 + r.hoy / 100) : null);
     const hoy = qt?.changePct ?? (ant ? (precio / ant - 1) * 100 : null);
-    return { p, r, precio, valor, hoy, pnl: valor - cant * (p.precio_prom ?? 0), pnlDia: ant ? (precio - ant) * cant : p.pnl_dia };
+    const g = ant ? ganaHoy(cant, precio, ant, qt ? ops.filter((o) => o.ticker === p.ticker && o.fecha === diaNY(qt.asOf)) : []) : null;
+    return { p, r, precio, valor, hoy, pnl: valor - cant * (p.precio_prom ?? 0), pnlDia: g?.gana ?? null, base: g?.base ?? 0 };
   });
+  const suma = (f: (x: (typeof filas)[number]) => number) => filas.reduce((n, x) => n + f(x), 0);
+  const total = suma((f) => f.valor), dia = suma((f) => f.pnlDia ?? 0), pnl = suma((f) => f.pnl), base = suma((f) => f.base);
+  const cuenta = total + (efectivo ?? 0);
+  return {
+    filas, total, dia, pnl, cuenta, efectivo, asOf, fallo,
+    /** Sin el efectivo: comparable con los demás periodos y con la gráfica. */
+    hoyInvertido: asOf && base ? (dia / base) * 100 : null,
+    /** Con el efectivo: como lo reporta IBKR. */
+    hoyCuenta: asOf && cuenta - dia ? (dia / (cuenta - dia)) * 100 : null,
+    // Con precios en vivo; si el servicio de precios falla se muestran los guardados y se avisa
+    listo: asOf != null || fallo || !pos.length,
+  };
+}
+
+/** Una sola fuente de precios en vivo para toda la página: así las cifras no se contradicen. */
+export function CuentaViva({ pos, ops, efectivo, children }: { pos: PosicionPublica[]; ops: Op[]; efectivo: number | null; children: React.ReactNode }) {
+  return <CuentaCtx.Provider value={useCuenta(pos, ops, efectivo)}>{children}</CuentaCtx.Provider>;
+}
+const useCuentaViva = () => useContext(CuentaCtx)!;
+
+/** Ganancia en dólares del año en curso: ventas del año + lo abierto a precio de ahora. */
+export function GananciaAnioVivo({ vendido }: { vendido: number }) {
+  const { pnl, listo } = useCuentaViva();
+  if (!listo) return <span className="skeleton block h-10 w-40 mt-1" />;
+  const t = vendido + pnl;
+  return (
+    <>
+      <p className="num text-sm mt-1">Ganancia: <b style={{ color: tono(t) }}>{signo(t)}</b></p>
+      <p className="num text-xs text-ink-soft">En ventas del año {signo(vendido)} · en lo que tenemos {signo(pnl)}</p>
+    </>
+  );
+}
+
+export function PortafolioEnVivo({ senales, realizado, ventas = {} }: { senales: Record<string, { key: string; label: string } | undefined>; realizado: number; ventas?: Ventas }) {
+  const { filas, total, dia, pnl, cuenta, efectivo, asOf, fallo, hoyInvertido, hoyCuenta, listo } = useCuentaViva();
   const ctl = useOrden<KPos>("valor", true, ["ticker"]);
   const vista = ordenar(filas, (f) => {
     switch (ctl.o.k) {
@@ -148,19 +191,14 @@ export function PortafolioEnVivo({ pos, senales, efectivo, realizado, ventas = {
       default: return f.valor;
     }
   }, ctl.o.desc);
-  const total = filas.reduce((a, f) => a + f.valor, 0);
-  const dia = filas.reduce((a, f) => a + (f.pnlDia ?? 0), 0);
-  const pnl = filas.reduce((a, f) => a + f.pnl, 0);
   const costo = total - pnl;
   // Rentabilidad con ventas: lo ganado en posiciones abiertas + lo ya realizado, sobre todo lo invertido (abierto + vendido)
   const costoVendido = Object.values(ventas).reduce((a, v) => a + v.costo, 0);
   const totalGan = pnl + realizado;
   const rentTotal = costo + costoVendido ? (totalGan / (costo + costoVendido)) * 100 : null;
-  const cuenta = total + (efectivo ?? 0);
-  const ayer = cuenta - dia;
   const kpis: Array<[string, string, string?, string?]> = [
     ["Valor de la cuenta", fmtMoney(cuenta), undefined, "posiciones + efectivo"],
-    ["Hoy", signo(dia), tono(dia), fmtPct(ayer ? (dia / ayer) * 100 : null, 2, true)],
+    ["Hoy", signo(dia), tono(dia), efectivo != null ? `${fmtPct(hoyCuenta, 2, true)} con efectivo · ${fmtPct(hoyInvertido, 2, true)} sin efectivo` : fmtPct(hoyInvertido, 2, true)],
     ["Ganancia total", signo(totalGan), tono(totalGan), `${fmtPct(rentTotal, 1, true)} con ventas`],
     ["No realizada · realizada", `${signo(pnl)}`, tono(pnl), `${signo(realizado)} realizada en ventas`],
     ["Invertido en posiciones", fmtMoney(costo)],
@@ -169,12 +207,13 @@ export function PortafolioEnVivo({ pos, senales, efectivo, realizado, ventas = {
   const COLS = "grid-cols-[minmax(0,1fr)_5rem_5.5rem] lg:grid-cols-[minmax(0,1.2fr)_5rem_5.5rem_6rem_4.2rem_4.2rem_4.2rem_6.5rem_6rem]";
   const pct = (v: number | null | undefined) => <span className="num text-right text-xs font-semibold" style={{ color: tono(v) }}>{fmtPct(v, 1, true)}</span>;
 
+  if (!listo) return <div className="skeleton w-full h-[36rem] rounded-2xl" role="status" aria-label="Cargando precios en vivo" />;
   return (
     <>
     <section className="space-y-2">
       <p className="text-xs text-ink-soft flex items-center gap-1.5">
         <span className="inline-block h-1.5 w-1.5 rounded-full bg-terracotta motion-safe:animate-pulse" />
-        Calculado en vivo · se actualiza cada 15 s{asOf ? ` · ${new Date(asOf).toLocaleTimeString("es-CO", { hour: "numeric", minute: "2-digit", second: "2-digit" })}` : ""}
+        {fallo && !asOf ? "Sin precios en vivo en este momento: se muestran los últimos guardados" : "Calculado en vivo · se actualiza cada 15 s"}{asOf ? ` · ${new Date(asOf).toLocaleTimeString("es-CO", { hour: "numeric", minute: "2-digit", second: "2-digit" })}` : ""}
       </p>
       <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
         {kpis.map(([k, v, c, sub]) => (
@@ -302,7 +341,7 @@ function Torta({ filas, efectivo }: { filas: Array<{ ticker: string; valor: numb
   );
 }
 
-/** % del año en curso con el mismo cálculo que "En el año" (TWR de IBKR + estimado en vivo desde su último cierre). */
+/** % del año en curso con el mismo cálculo que "En el año" (TWR con las órdenes). */
 export function PctAnioVivo({ respaldo }: { respaldo: number | null }) {
   const [v, setV] = useState<number | null>(null);
   useEffect(() => {

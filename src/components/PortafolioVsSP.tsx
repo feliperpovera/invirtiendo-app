@@ -16,11 +16,11 @@ interface Datos {
   inicioPortafolio: number | null;
   /** Termina con el punto "ahora" (precios de este minuto) */
   enVivo: boolean;
-  /** "ibkr" = rendimiento oficial de la cuenta; "estimado" = hoy, con los pesos por el precio actual */
+  /** "ibkr" = TWR calculado con las órdenes; "estimado" = hoy, con los pesos por el precio actual */
   fuente: "ibkr" | "estimado";
-  /** Último cierre que publicó IBKR (medianoche UTC) */
+  /** Último día de la serie (medianoche UTC) */
   hasta: number | null;
-  /** Último día oficial de IBKR cuando los siguientes son estimados (sincronización atrasada) */
+  /** Último día calculado cuando los siguientes son estimados */
   estimadoDesde?: number | null;
   pesos: Array<{ ticker: string; peso: number }>;
 }
@@ -358,7 +358,7 @@ export function PortafolioVsSP({ cuenta = "principal", titulo = "Portafolio Invi
                 <span className="absolute inline-flex h-full w-full rounded-full bg-terracotta opacity-60 motion-safe:animate-ping" />
                 <span className="relative inline-flex h-2 w-2 rounded-full bg-terracotta" />
               </span>
-              En vivo · se actualiza cada minuto{d.fuente === "ibkr" && d.hasta ? ` · oficial de IBKR al cierre del ${fecha(d.hasta, "1M", true)}, lo de hoy estimado` : " · estimado con las posiciones de IBKR"}
+              En vivo · se actualiza cada minuto{cuenta === "principal" ? " · calculado con nuestras órdenes y precios de mercado" : " · estimado con las posiciones actuales"}
             </p>
           )}
         </div>
@@ -413,7 +413,7 @@ export function PortafolioVsSP({ cuenta = "principal", titulo = "Portafolio Invi
             <span className="inline-flex items-center gap-1.5 text-ink-soft"><span className="inline-block h-[2px] w-4 rounded bg-ink-soft" />{idx.nombre}</span>
             <span className="inline-flex items-center gap-1 text-olive-deep">▲ compra</span>
             <span className="inline-flex items-center gap-1" style={{ color: "var(--sig-avoid)" }}>▼ venta</span>
-            {d.estimadoDesde && <span className="inline-flex items-center gap-1.5 font-normal text-ink-soft"><span className="inline-block w-4 border-t-2 border-dashed border-terracotta" />estimado hasta la próxima sincronización con IBKR</span>}
+            {d.estimadoDesde && <span className="inline-flex items-center gap-1.5 font-normal text-ink-soft"><span className="inline-block w-4 border-t-2 border-dashed border-terracotta" />estimado con los pesos actuales</span>}
             <span className="font-normal text-ink-soft sm:ml-auto">Sobre el {idx.nombre}:</span>
             <button type="button" aria-pressed={showEma} onClick={() => setShowEma(!showEma)} className={`rounded-full border px-2 py-0.5 ${showEma ? "border-ink" : "border-line text-ink-soft"}`}>
               <span className="mr-1 inline-block h-0.5 w-3 align-middle" style={{ background: "var(--olive)" }} />EMA 200
@@ -432,7 +432,7 @@ export function PortafolioVsSP({ cuenta = "principal", titulo = "Portafolio Invi
             </p>
           ) : (
           <p className="mt-3 text-xs leading-relaxed text-ink-soft">
-            Cuenta real de Invirtiendoo en Interactive Brokers, empezó en diciembre de 2025: en 1, 3 y 5 años el S&amp;P se ve completo y el portafolio arranca ese día, pegado a su línea. Rendimiento ponderado por tiempo (TWR): los aportes nuevos no cuentan como ganancia. Incluye dividendos; el S&amp;P 500 es el índice de precio, sin dividendos. &quot;Hoy&quot; es un estimado en vivo con los pesos del último cierre; los demás periodos son el dato oficial de IBKR. Rendimientos pasados no aseguran resultados futuros.
+            Cuenta real de Invirtiendoo en Interactive Brokers, empezó en diciembre de 2025: en 1, 3 y 5 años el S&amp;P se ve completo y el portafolio arranca ese día, pegado a su línea. Rendimiento ponderado por tiempo (TWR): los aportes nuevos no cuentan como ganancia. Se calcula con nuestras órdenes (al precio pagado o vendido) y los cierres de mercado; no incluye dividendos, comisiones ni el efectivo, así que puede diferir de IBKR. El S&amp;P 500 es el índice de precio, sin dividendos. &quot;1D&quot; usa las posiciones con que abrió la sesión. Rendimientos pasados no aseguran resultados futuros.
           </p>
           )}
         </>

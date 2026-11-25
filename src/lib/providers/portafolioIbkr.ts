@@ -1,9 +1,4 @@
-/**
- * Portafolio real de Invirtiendoo en Interactive Brokers, leído de Supabase.
- * Lo carga una tarea diaria que consulta IBKR (get_pa_performance_all_periods y
- * get_account_positions) y llama a la función `portafolio_ibkr_cargar`: aquí solo hay
- * porcentajes. Nunca el valor de la cuenta, cantidades ni precios de compra.
- */
+/** Portafolio principal calculado con las órdenes guardadas en Supabase y cierres de Yahoo (el nombre "Ibkr" es histórico). */
 import { cached } from "./cache";
 import { yahooSerie } from "./yahoo";
 import { leerMovimientos } from "./portafolioPublico";
@@ -28,6 +23,11 @@ export function pesosIbkr(): Promise<Array<{ ticker: string; peso: number }>> {
   return cached("mov:pesos", 15 * 60 * 1000, async () => (await calcular()).pesos);
 }
 
+/** Pesos con que abrió la última sesión (antes de sus compras y ventas, al cierre anterior). */
+export async function pesosApertura() {
+  return (await calcular()).apertura;
+}
+
 const calcular = () =>
   cached("mov:calc", 15 * 60 * 1000, async () => {
     const mov = (await leerMovimientos("principal")).filter((m) => m.cantidad && m.precio).reverse(); // viejo → nuevo
@@ -45,8 +45,14 @@ const calcular = () =>
     const valor = () => [...h].reduce((s, [t, q]) => s + q * (ultimo.get(t) ?? 0), 0);
     let nivel = 1, j = 0;
     const niveles: PricePoint[] = [];
+    const pesar = () => {
+      const total = valor();
+      return [...h].filter(([, q]) => q > 1e-6).map(([t, q]) => ({ ticker: t, peso: Math.round((q * (ultimo.get(t) ?? 0) * 10000) / total) / 100 })).sort((a, b) => b.peso - a.peso);
+    };
+    let apertura: ReturnType<typeof pesar> = [];
     for (const d of [...dias].sort((a, b) => a - b)) {
       const antes = valor();
+      apertura = pesar();
       let flujo = 0;
       while (j < mov.length && diaUTC(mov[j].fecha) <= d) {
         const m = mov[j++], q = Number(m.cantidad), px = Number(m.precio), s = m.tipo === "venta" ? -1 : 1;
@@ -60,7 +66,5 @@ const calcular = () =>
       if (base > 0) nivel *= valor() / base;
       niveles.push({ t: d, c: nivel });
     }
-    const total = valor();
-    const pesos = [...h].filter(([, q]) => q > 1e-6).map(([t, q]) => ({ ticker: t, peso: Math.round((q * (ultimo.get(t) ?? 0) * 10000) / total) / 100 })).sort((a, b) => b.peso - a.peso);
-    return { niveles, pesos };
+    return { niveles, pesos: pesar(), apertura };
   });

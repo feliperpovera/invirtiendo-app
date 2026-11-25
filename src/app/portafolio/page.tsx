@@ -4,7 +4,7 @@ import { leerPosiciones, leerMovimientos, leerResumen } from "@/lib/providers/po
 import { leerRanking } from "@/lib/providers/ranking";
 import { nivelesIbkr } from "@/lib/providers/portafolioIbkr";
 import { PortafolioVsSP } from "@/components/PortafolioVsSP";
-import { PortafolioEnVivo, RendimientoCuenta, PctAnioVivo } from "@/components/PortafolioVivo";
+import { CuentaViva, GananciaAnioVivo, PortafolioEnVivo, RendimientoCuenta, PctAnioVivo } from "@/components/PortafolioVivo";
 import { PosicionesGraficas } from "@/components/PosicionesGraficas";
 import { Movimientos } from "@/components/Movimientos";
 import { Card, Eyebrow } from "@/components/ui";
@@ -28,9 +28,8 @@ export default async function PortafolioPage({ searchParams }: { searchParams: P
   const cuenta = CUENTAS.some((c) => c.id === pedida) ? pedida! : "principal";
   const principal = cuenta === "principal";
   const [pos, mov, res, rk, niveles] = await Promise.all([leerPosiciones(cuenta), leerMovimientos(cuenta), principal ? leerResumen() : Promise.resolve(null), leerRanking(200), principal ? nivelesIbkr().catch(() => []) : Promise.resolve([])]);
-  // Rentabilidad por año calendario: % ponderado por tiempo de IBKR (último nivel del año / último del año anterior)
+  // Rentabilidad por año calendario: % ponderado por tiempo (último nivel del año / último del año anterior)
   // y en dinero lo ganado vendiendo ese año; el año en curso suma además lo que va ganando lo que todavía se tiene.
-  const noRealizado = pos.reduce((a, p) => a + (p.pnl ?? 0), 0);
   const anios = [...new Set([...niveles.map((n) => new Date(n.t).getUTCFullYear()), ...mov.map((m) => Number(m.fecha.slice(0, 4)))])].sort((a, b) => b - a);
   const anioActual = anios[0];
   const porAnio = anios.map((y) => {
@@ -38,7 +37,7 @@ export default async function PortafolioPage({ searchParams }: { searchParams: P
     const base = ult(y - 1) ?? niveles.find((n) => new Date(n.t).getUTCFullYear() === y)?.c;
     const fin = ult(y);
     const vendido = mov.filter((m) => m.fecha.startsWith(String(y))).reduce((a, m) => a + (m.pnl_realizado ?? 0), 0);
-    return { y, pct: base && fin ? (fin / base - 1) * 100 : null, vendido, total: vendido + (y === anioActual ? noRealizado : 0) };
+    return { y, pct: base && fin ? (fin / base - 1) * 100 : null, vendido };
   });
   const senal = new Map(rk.map((r) => [r.ticker, r]));
   const act = res?.actualizado ?? pos[0]?.actualizado;
@@ -66,18 +65,19 @@ export default async function PortafolioPage({ searchParams }: { searchParams: P
         <h1 className="font-display text-4xl sm:text-5xl leading-none">{CUENTAS.find((c) => c.id === cuenta)!.h1}</h1>
         <p className="text-ink-soft mt-3 max-w-2xl text-sm">
           {principal
-            ? "Cada acción, cada compra y cada venta de nuestra cuenta en Interactive Brokers. Valor y ganancias se calculan en vivo con precios de mercado sobre nuestras posiciones; las posiciones se revisan contra IBKR una vez al día"
+            ? "Cada acción, cada compra y cada venta de nuestra cuenta en Interactive Brokers. Valor y ganancias se calculan en vivo con precios de mercado sobre nuestras posiciones; las compras y ventas se cargan a mano desde IBKR"
             : cuenta === "inv"
             ? "Cuenta INV en BTG Pactual, abierta en octubre de 2010. Posiciones y costo según el extracto de BTG; valor y ganancias se calculan en vivo con precios de mercado. Se actualiza con cada extracto mensual"
             : "Posiciones de la cuenta GA en Interactive Brokers. Valor y ganancias se calculan en vivo con precios de mercado sobre sus cantidades y precio promedio; las posiciones se actualizan cuando hay compras o ventas"}
-          {act ? ` (última revisión ${new Date(act).toLocaleDateString("es-CO", { timeZone: "America/Bogota", day: "numeric", month: "short" })})` : ""}.
+          {act ? ` (última actualización ${new Date(act).toLocaleDateString("es-CO", { timeZone: "America/Bogota", day: "numeric", month: "short" })})` : ""}.
         </p>
       </div>
 
 
 
 
-      <PortafolioEnVivo pos={pos} efectivo={res?.efectivo ?? null} realizado={realizado} ventas={ventas} senales={Object.fromEntries(pos.map((p) => [p.ticker, senal.get(p.ticker)?.senal_key ? { key: senal.get(p.ticker)!.senal_key!, label: senal.get(p.ticker)!.senal ?? "" } : undefined]))} />
+      <CuentaViva pos={pos} ops={mov.map(({ fecha, ticker, tipo, cantidad, precio }) => ({ fecha, ticker, tipo, cantidad, precio })).slice(0, 60)} efectivo={res?.efectivo ?? null}>
+      <PortafolioEnVivo realizado={realizado} ventas={ventas} senales={Object.fromEntries(pos.map((p) => [p.ticker, senal.get(p.ticker)?.senal_key ? { key: senal.get(p.ticker)!.senal_key!, label: senal.get(p.ticker)!.senal ?? "" } : undefined]))} />
 
       {porAnio.length > 0 && (
         <section className="space-y-2">
@@ -86,22 +86,22 @@ export default async function PortafolioPage({ searchParams }: { searchParams: P
             {porAnio.map((a) => (
               <Card key={a.y} className="p-4">
                 <p className="font-display text-2xl">{a.y}{a.y === anioActual && <span className="text-xs font-sans text-ink-soft ml-2">en curso</span>}</p>
-                {a.y === anioActual ? (
+                {principal && a.y === anioActual ? (
                   <PctAnioVivo respaldo={a.pct} />
                 ) : a.pct != null && (
                   <p className="num font-display text-3xl leading-tight" style={{ color: a.pct >= 0 ? "var(--sig-strong)" : "var(--sig-avoid)" }}>{fmtPct(a.pct, 2, true)}</p>
                 )}
-                <p className="num text-sm mt-1">
-                  Ganancia: <b style={{ color: a.total >= 0 ? "var(--sig-strong)" : "var(--sig-avoid)" }}>{a.total >= 0 ? "+" : "−"}{fmtMoney(Math.abs(a.total))}</b>
-                </p>
-                <p className="num text-xs text-ink-soft">
-                  En ventas del año {a.vendido >= 0 ? "+" : "−"}{fmtMoney(Math.abs(a.vendido))}
-                  {a.y === anioActual && <> · en lo que tenemos {noRealizado >= 0 ? "+" : "−"}{fmtMoney(Math.abs(noRealizado))}</>}
-                </p>
+                {a.y === anioActual ? (
+                  <GananciaAnioVivo vendido={a.vendido} />
+                ) : (
+                  <p className="num text-sm mt-1">
+                    Ganancia en ventas: <b style={{ color: a.vendido >= 0 ? "var(--sig-strong)" : "var(--sig-avoid)" }}>{a.vendido >= 0 ? "+" : "−"}{fmtMoney(Math.abs(a.vendido))}</b>
+                  </p>
+                )}
               </Card>
             ))}
           </div>
-          <p className="text-xs text-ink-soft">% = rentabilidad ponderada por tiempo de IBKR (los aportes no cuentan como ganancia). Ganancia en dólares = ventas cerradas en el año más, en el año en curso, lo que van ganando las posiciones abiertas.</p>
+          <p className="text-xs text-ink-soft">{principal && "% = rentabilidad ponderada por tiempo, calculada con nuestras órdenes y los cierres de mercado (los aportes no cuentan como ganancia; sin dividendos, comisiones ni efectivo). "}Ganancia en dólares = ventas cerradas en el año más, en el año en curso, lo que van ganando a precio de ahora las posiciones abiertas, desde que se compraron.</p>
         </section>
       )}
 
@@ -111,6 +111,8 @@ export default async function PortafolioPage({ searchParams }: { searchParams: P
           <RendimientoCuenta />
         </section>
       )}
+
+      </CuentaViva>
 
       <PortafolioVsSP cuenta={cuenta} titulo={CUENTAS.find((c) => c.id === cuenta)!.titulo} />
 
@@ -122,7 +124,7 @@ export default async function PortafolioPage({ searchParams }: { searchParams: P
       <p className="text-xs text-ink-soft border-t border-line pt-3">
         {cuenta === "inv"
           ? "Fuente: extracto mensual de BTG Pactual (cantidades y costo). Precios de mercado en vivo; la gráfica frente al índice es una simulación con las posiciones actuales. Contenido educativo; no es una recomendación."
-          : "Fuente: Interactive Brokers (posiciones, operaciones y valor de la cuenta). Compra prom. y ganancia según IBKR; la ganancia realizada es la que reporta IBKR en cada venta, después de comisiones. " + (principal ? "La rentabilidad de la cuenta en la gráfica es ponderada en el tiempo (TWR). " : "La gráfica frente al índice es una simulación con las posiciones actuales. ") + "Contenido educativo; no es una recomendación."}
+          : "Fuente: operaciones de Interactive Brokers cargadas a mano y precios de mercado. La ganancia realizada es la que reportó IBKR en cada venta, después de comisiones; lo demás es cálculo propio y puede diferir de IBKR. " + (principal ? "La rentabilidad de la cuenta en la gráfica es ponderada en el tiempo (TWR), calculada con las órdenes. " : "La gráfica frente al índice es una simulación con las posiciones actuales. ") + "Contenido educativo; no es una recomendación."}
       </p>
     </div>
   );
