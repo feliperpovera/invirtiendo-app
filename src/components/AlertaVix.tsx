@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 
 export const UMBRAL_VIX = 30;
+/** La franja aparece antes que la notificación: desde 25. */
+export const UMBRAL_FRANJA = 25;
 const CLAVE = "vix-avisado";
 
 /** Último VIX cada 5 minutos; si cruza 30 y el navegador lo permite, una notificación por día. */
@@ -37,13 +39,14 @@ function avisar(v: number) {
   new Notification(`VIX en ${v.toFixed(2)}: miedo en el mercado`, { body: `Superó ${UMBRAL_VIX}. Revisa el Fear & Greed en Invirtiendo.`, icon: "/brand/icono.png", tag: "vix" });
 }
 
-/** Franja en toda la página mientras el VIX esté en 30 o más. */
+/** Franja en toda la página mientras el VIX esté en 25 o más (roja desde 30). */
 export function AvisoVix() {
   const v = useVix();
-  if (v == null || v < UMBRAL_VIX) return null;
+  if (v == null || v < UMBRAL_FRANJA) return null;
+  const miedo = v >= UMBRAL_VIX;
   return (
-    <Link href="/miedo-codicia" role="alert" className="block bg-[var(--sig-avoid)] text-cream text-center text-sm font-bold px-4 py-2 hover:opacity-90">
-      ⚠︎ VIX en <span className="num">{v.toFixed(2)}</span>: por encima de {UMBRAL_VIX}, miedo en el mercado · ver Fear &amp; Greed →
+    <Link href="/miedo-codicia" role="alert" className={`block text-center text-sm font-bold px-4 py-2 hover:opacity-90 ${miedo ? "bg-[var(--sig-avoid)] text-cream" : "bg-[var(--sig-watch)] text-ink"}`}>
+      ⚠︎ VIX en <span className="num">{v.toFixed(2)}</span>: {miedo ? `por encima de ${UMBRAL_VIX}, miedo en el mercado` : `por encima de ${UMBRAL_FRANJA}, nervios en el mercado`} · ver Fear &amp; Greed →
     </Link>
   );
 }
