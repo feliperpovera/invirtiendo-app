@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Fraunces, Figtree } from "next/font/google";
 import "./globals.css";
+import { AvisoVix } from "@/components/AlertaVix";
 import { Nav } from "@/components/Nav";
 
 const fraunces = Fraunces({
@@ -40,6 +41,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className="min-h-full flex flex-col">
         <Nav />
+        <AvisoVix />
         <main className="flex-1 w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pb-16">{children}</main>
         {/* Redes: el contenido nace en IG/TikTok, la página lleva de vuelta allá */}
         <section className="mt-12 bg-ink text-cream">

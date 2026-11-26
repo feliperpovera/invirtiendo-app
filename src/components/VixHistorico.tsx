@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { ordenar } from "@/lib/orden";
 import { SelectOrden, useOrden } from "./Orden";
+import { BotonAvisoVix } from "./AlertaVix";
 
 type Dia = readonly [number, number, number, number];
 type Data = { actual: number | null; dias: Dia[]; picos: Array<{ t: number; v: number }> };
@@ -73,6 +74,7 @@ export function VixHistorico() {
         </div>
         {d.actual != null && <p className="num text-3xl font-bold" style={{ color: d.actual >= 30 ? "var(--sig-avoid)" : d.actual >= 20 ? "var(--sig-watch)" : "var(--sig-strong)" }}>{d.actual.toFixed(2)}</p>}
       </div>
+      <BotonAvisoVix />
       <div role="group" aria-label="Periodo" className="flex flex-wrap gap-1">
         {RANGOS.map(([k]) => (
           <button key={k} type="button" aria-pressed={rango === k} onClick={() => { setRango(k); setHover(null); }} className={`rounded-full px-2.5 py-1 text-xs font-bold ${rango === k ? "bg-ink text-cream" : "border border-line text-ink-soft hover:border-ink"}`}>{k}</button>
